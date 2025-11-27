@@ -262,4 +262,46 @@ Requires Graphviz and `diagrams` package.
 - Function App CORS is open to allow browser XHR; protect sensitive data on the server only and avoid logging IDs on the client.
 
 ## License
-RESTRICTED IP — Internal use only.
+
+This project is released under a **dual-licensing** model:
+
+### Community Edition – AGPL-3.0
+
+The core of this project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+In practical terms, this means:
+
+- You can **use, modify, and redistribute** the code, including for commercial purposes.
+- If you **modify** the code and make it available to others **or** run it as a **networked service (SaaS)**, you must:
+  - Provide access to the **source code** of your modified version, and  
+  - Keep it under the **AGPL-3.0** license.
+
+See the full license text in the [`LICENSE`](./LICENSE) file for details.
+
+### Commercial License
+
+If your organization:
+
+- Wants to integrate this project into a **closed-source** product or platform,
+- Plans to offer it as a **hosted service** without sharing modifications, or
+- Requires different **legal / compliance** terms than AGPL-3.0 allows,
+
+a **commercial license** is available.
+
+Commercial licensing typically includes:
+
+- The right to **use and modify** the software **without** the copyleft/AGPL obligations  
+- Optional **support**, **feature prioritization**, and **integration guidance**
+
+For commercial licensing, support, or custom engagements, please contact:
+
+> **Author:** Robert Vance  
+> **Email:** ravance@gmail.com
+> **Subject:** “PULSE Trainer – Commercial License Inquiry”
+
+---
+
+**Summary**
+
+- **Individual developers, researchers, and open-source teams**: use AGPL-3.0.  
+- **Companies wanting proprietary use or SaaS without sharing changes**: reach out for a commercial license.
