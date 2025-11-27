@@ -140,3 +140,9 @@
   - `diag_functionapp (FunctionAppLogs, AppServiceHTTPLogs)` from Function App to Log Analytics.
 - These labels keep the rendered PNG/SVG/draw.io diagrams in sync with the actual Terraform diagnostics configuration and make it easier to reason about which logs are flowing where during PULSE training sessions.
 
+## 2025-11-27
+
+### CI / UI
+- Added minimal ESLint configuration file `ui/.eslintrc.json` extending `next/core-web-vitals` so that `next lint` runs non-interactively in both local and CI environments.
+- This prevents the Next.js ESLint setup wizard from prompting in GitHub Actions when `npm run lint` is executed, unblocking the `UI Lint & Build` job in `.github/workflows/ci-infra-ui.yml`.
+- No changes to the lint script itself (`"lint": "next lint"`); behavior is controlled via the new config file.
