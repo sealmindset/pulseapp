@@ -65,3 +65,13 @@ Return your response as valid JSON with this exact structure:
     "improvements": "string"
   }
 }
+
+## Implementation notes (this repo)
+
+- Canonical evaluator/coach system prompt for PULSE 0–3 scoring in this repository.
+- When seeding via the Admin Prompts UI (`/admin` → Prompts), use the following metadata:
+  - `id`: `pulse-evaluator-v1`
+  - `agentId`: `pulse-evaluator-v1`
+  - `title`: `PULSE Evaluator (0–3 PULSE steps)`
+  - `type`: `system`
+- Store this entire markdown body in the `content` field of the prompt so the evaluator agent returns the JSON shape defined above.

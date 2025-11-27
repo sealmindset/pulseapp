@@ -1,0 +1,27 @@
+{
+  "name": "pulseapp",
+  "version": "1.0.0",
+  "description": "Secure Azure Terraform IaC + Next.js UI/UX",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sealmindset/pulseapp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/sealmindset/pulseapp/issues"
+  },
+  "homepage": "https://github.com/sealmindset/pulseapp#readme",
+  "dependencies": {
+    "dotenv": "^17.2.3"
+  }
+}

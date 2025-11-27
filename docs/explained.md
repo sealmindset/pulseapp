@@ -55,7 +55,7 @@ Use these two core statements as the spine of the narrative.
 
 ### Problem Statement (given)
 
-> This initiative is essential because we’re experiencing a high turnover rate among sales associates. Training at scale has become a bottleneck, and ensuring every new associate is thoroughly trained in the **Sell by Number** methodology is critical to improving conversion rates and overall store performance.
+> This initiative is essential because we’re experiencing a high turnover rate among sales associates. Training at scale has become a bottleneck, and ensuring every new associate is thoroughly trained in the **PULSE Selling** methodology is critical to improving conversion rates and overall store performance.
 
 ### Solution Vision (given)
 
@@ -71,19 +71,18 @@ When you write, **do not just restate** these sentences. Instead, expand them in
 
 ---
 
-## 4. PULSE Methodology – What You Need to Convey
+## 4. PULSE Selling Methodology – What You Need to Convey
 
-PULSE (Selling by Numbers) is a **structured, proprietary sales methodology** used to turn customer interactions into consistent, high‑conversion experiences.
+PULSE Selling is a **structured, proprietary sales methodology** used to turn customer interactions into consistent, high‑conversion experiences.
 
 At a high level:
 
-- It is organized around **six steps** (from our UI progress bar):
-  1. Connect & Discover
-  2. Guide & Curate
-  3. Individualize
-  4. Address & Close Today
-  5. Confirm & Reassure
-  6. Follow Up & Advocate
+- It is organized around **five steps**:
+  1. **Probe** – Open the conversation, build rapport, and ask smart, open-ended questions that reveal context fast.
+  2. **Understand** – Go beyond surface requests to uncover true needs, constraints, and emotions; reflect back what you heard.
+  3. **Link** – Connect recommendations directly to what the customer said, using their language and goals.
+  4. **Simplify** – Reduce friction and confusion by narrowing choices and explaining trade-offs in plain language.
+  5. **Earn** – Make a professional recommendation and earn a clear commitment (decision, scheduled follow-up, or next step).
 - It is applied to four core **personas** (Platinum Rule styles):
   - **Thinker** – analytical, detail‑oriented, wants logical justification.
   - **Socializer** – enthusiastic, rapport‑driven, responds to energy and connection.

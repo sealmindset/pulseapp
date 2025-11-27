@@ -1,4 +1,4 @@
-This solution outlines the **Agentic AI Prompt** (the orchestrator) and the three specialized **Agent Prompts** required to evaluate a sales trainee's performance against the proprietary **Selling by Numbers (PULSE) methodology (H2)** and its behavioral certification requirements (H4).
+This solution outlines the **Agentic AI Prompt** (the orchestrator) and the three specialized **Agent Prompts** required to evaluate a sales trainee's performance against the proprietary **PULSE Selling methodology (H2)** and its behavioral certification requirements (H4).
 
 The system is designed to assess the fidelity of execution and comprehension necessary to compel the specific customer persona (Director, Relater, Socializer, Thinker) to "commit to purchase and buys today".
 

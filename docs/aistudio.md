@@ -11,11 +11,11 @@ All of this must preserve and ideally enhance the app’s ability to fulfill the
 > Training sales associates on the PULSE methodology in a controlled, measurable, and scalable way.
 
 CONTEXT
-I am working on an PULSE Trainer application that teaches and evaluates sales associates on the PULSE (Selling by Numbers) methodology.
+I am working on a PULSE Trainer application that teaches and evaluates sales associates on the **PULSE Selling** methodology.
 
-High-level PULSE methodology (for context):
-- PULSE is a structured 6-step selling process for retail / store associates.
-- It emphasizes: building rapport, discovering customer “hot buttons,” guiding & curating choices, individualizing recommendations, addressing objections, closing today, and confirming/reassuring.
+High-level PULSE Selling methodology (for context):
+- PULSE is a **five-step** conversational structure for high-quality customer interactions: Probe, Understand, Link, Simplify, Earn.
+- It emphasizes: opening with smart discovery questions, deeply understanding needs and constraints, clearly linking recommendations to what the customer said, simplifying choices and trade-offs, and earning a clear next step or commitment.
 - The trainer app should simulate realistic sales interactions, enforce PULSE steps, provide feedback and scoring, and be aligned with store operations and coaching workflows.
 
 I want to explore using **Azure AI Studio (Foundry) & Services** for:

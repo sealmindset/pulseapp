@@ -1,0 +1,8 @@
+{
+  "id": "pulse-evaluator-v1",
+  "agentId": "pulse-evaluator-v1",
+  "title": "PULSE Evaluator (0–3 PULSE steps)",
+  "type": "system",
+  "contentFormat": "markdown",
+  "content": "See docs/pulseagent.md for the full PULSE evaluator/coach system prompt. Paste the entire file contents here when creating or updating this prompt via the Admin UI."
+}

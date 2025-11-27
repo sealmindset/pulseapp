@@ -8,7 +8,7 @@ type Props = {
 // P – Probe, U – Understand, L – Link, S – Simplify, E – Earn
 const STEPS = ["Probe", "Understand", "Link", "Simplify", "Earn"] as const;
 
-export default function SbnProgressBar({ currentStep }: Props) {
+export default function PulseProgressBar({ currentStep }: Props) {
   return (
     <ol className="grid grid-cols-5 gap-2 text-xs">
       {STEPS.map((label, idx) => {

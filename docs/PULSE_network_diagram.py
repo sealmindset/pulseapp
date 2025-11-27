@@ -21,7 +21,10 @@ def build_topology():
                 app_subnet = Subnets("Subnet: PULSE-app-subnet")
                 plan = AppServicePlans("App Service Plan (asp-PULSE-training-<env>)")
                 web = AppServices("Web App: app-PULSE-training-ui-<env>")
-                func = FunctionApps("Function App: func-PULSE-training-scenario-<env>")
+                func = FunctionApps(
+                    "Function App: func-PULSE-training-scenario-<env>\n"
+                    "Routes: /session/*, /audio/chunk, /trainer/pulse/step, /admin/*"
+                )
                 app_subnet - Edge(label="hosts") - plan
                 app_subnet - Edge(label="hosts") - web
                 app_subnet - Edge(label="hosts") - func
@@ -66,8 +69,12 @@ def build_topology():
             storage = StorageAccounts("Storage Account (sa-<name>)")
             container_cert = StorageAccounts("Container: certification-materials")
             container_logs = StorageAccounts("Container: interaction-logs")
+            container_prompts = StorageAccounts("Container: prompts")
+            container_trainer_logs = StorageAccounts("Container: trainer-change-logs")
             storage >> container_cert
             storage >> container_logs
+            storage >> container_prompts
+            storage >> container_trainer_logs
 
         # Observability (Log Analytics + Application Insights)
         with Cluster("Observability"):
@@ -179,7 +186,15 @@ def render_drawio(output_basename: str) -> None:
 
     add_vertex("plan", "App Service Plan (asp-PULSE-training-<env>)", 140, 300, 220, 60, parent="subnet_app")
     add_vertex("web", "Web App: app-PULSE-training-ui-<env>", 140, 380, 220, 60, parent="subnet_app")
-    add_vertex("func", "Function App: func-PULSE-training-scenario-<env>", 140, 460, 260, 60, parent="subnet_app")
+    add_vertex(
+        "func",
+        "Function App: func-PULSE-training-scenario-<env>\\nRoutes: /session/*, /audio/chunk, /trainer/pulse/step, /admin/*",
+        140,
+        460,
+        260,
+        60,
+        parent="subnet_app",
+    )
 
     add_vertex("pe_openai", "Private Endpoint: Azure OpenAI", 500, 300, 260, 60, parent="subnet_pe")
     add_vertex("pe_blob", "Private Endpoint: Storage Blob", 500, 380, 260, 60, parent="subnet_pe")
@@ -198,6 +213,8 @@ def render_drawio(output_basename: str) -> None:
     add_vertex("storage", "Storage Account (sa-<name>)", 1240, 340, 260, 80, parent="rg")
     add_vertex("container_cert", "Container: certification-materials", 1260, 440, 260, 40, parent="storage")
     add_vertex("container_logs", "Container: interaction-logs", 1260, 490, 260, 40, parent="storage")
+    add_vertex("container_prompts", "Container: prompts", 1260, 540, 260, 40, parent="storage")
+    add_vertex("container_trainer_logs", "Container: trainer-change-logs", 1260, 590, 260, 40, parent="storage")
 
     add_vertex("law", "Log Analytics Workspace (law-PULSE-training-<env>)", 1240, 80, 280, 60, parent="rg")
     add_vertex("ai", "Application Insights (appi-PULSE-training-<env>)", 1240, 160, 280, 60, parent="rg")
@@ -229,6 +246,8 @@ def render_drawio(output_basename: str) -> None:
 
     add_edge("e_storage_cert", "storage", "container_cert")
     add_edge("e_storage_logs", "storage", "container_logs")
+    add_edge("e_storage_prompts", "storage", "container_prompts")
+    add_edge("e_storage_trainer_logs", "storage", "container_trainer_logs")
 
     add_edge("e_openai_law", "openai_account", "law", label="diag_openai (Audit, RequestResponse)")
     add_edge("e_storage_law", "storage", "law", label="diag_storage (StorageRead/Write/Delete)")

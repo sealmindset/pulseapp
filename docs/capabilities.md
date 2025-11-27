@@ -26,3 +26,37 @@ The current PULSE infrastructure and app implementation realize these capabiliti
 *   **End-to-end private networking:** Azure OpenAI and Storage are reachable only via Private Endpoints and Private DNS; the browser never calls Azure OpenAI directly. All STT/TTS and behavior evaluation flows run through the VNet-integrated Function App, which enforces the RESTRICTED IP and behavioral certification requirements.
 
 In summary, the inclusion of **Azure OpenAI real-time audio models** (conceptually aligned with `gpt-4o` audio capabilities) is reflected in the Terraform configuration and application code as a dedicated audio deployment (`PULSE-Audio-Realtime`) wired through the Function App and Next.js UI. Together, these components deliver the fully vocalized, immersive role-playing experience required for certifying **Mastery-Level Sales Talent (H4)**.
+
+### 4. PULSE Trainer Agent (Dev Preview)
+
+On top of the audio and chat capabilities, the platform includes an experimental **PULSE Trainer Agent** that provides step-focused coaching for the PULSE Selling framework in a dedicated Training Mode flow.
+
+- **Training flow:** The Next.js UI exposes a `/training` page that calls a backend trainer endpoint (`POST /trainer/pulse/step`) via the orchestrator Function App. The UI sends structured `CONFIG` and `SESSION` JSON describing the current PULSE step, scenario rubric, and learner answer.
+- **Adaptive vs static behavior:** The trainer uses Azure OpenAI chat models (via the Function App) to:
+  - Diagnose strengths and weaknesses for the active PULSE step.
+  - Ask targeted follow-up questions when adaptive training is enabled.
+  - Estimate step-level mastery and optionally emit self-annealing `trainer_change_log` suggestions for rubric/prompt improvements.
+- **Environment gating:** Training is explicitly gated so it can be piloted safely in non-production environments:
+  - UI visibility requires `NEXT_PUBLIC_ENABLE_TRAINING=true` and `NEXT_PUBLIC_ENV_NAME!=prod`.
+  - Backend LLM calls require `PULSE_TRAINER_ENABLED=true`; when disabled, the trainer returns a static-evaluation JSON payload and never calls Azure OpenAI.
+
+All trainer interactions continue to respect the same private networking guarantees: the browser never talks to Azure OpenAI directly and all requests flow through the VNet-integrated Function App.
+
+### 5. PULSE Evaluator and Coaching Capabilities
+
+Beyond real-time coaching, the platform defines a **PULSE Evaluator/Coach** responsible for scoring completed conversations and providing structured coaching feedback.
+
+- **PULSE 0–3 scoring:** The evaluator uses the five-step PULSE Selling framework (Probe, Understand, Link, Simplify, Earn) and assigns a **0–3 score per step**, where 0 = not demonstrated, 1 = weak, 2 = solid, 3 = strong.
+- **Structured JSON output:** The evaluator returns a consistent JSON object with:
+  - `framework: "PULSE"`.
+  - `scores` for each PULSE step, each containing `score`, a short textual `reason`, and 1–2 concrete `tips`.
+  - An `overall_summary` section capturing strengths and top improvement opportunities.
+- **Prompt definition:** The canonical system prompt and JSON contract for this evaluator live in `docs/pulseagent.md` and are managed as a versioned system prompt (`pulse-evaluator-v1`) via the Admin Prompts UI. Future `/feedback/{sessionId}` implementations can load this prompt and produce standardized PULSE 0–3 evaluations over stored transcripts.
+
+### 6. Admin Prompt Editing and Self-Annealing
+
+The platform includes tooling to evolve prompts and rubrics safely over time while preserving RESTRICTED IP controls.
+
+- **Admin Prompt Editor (dev mode):** A gated `/admin` experience (enabled only in non-production environments) allows operators to create, view, and version prompts and agent definitions. Prompt content is persisted to a private Azure Blob container with per-version snapshots.
+- **Trainer self-annealing logs:** When configured, the PULSE Trainer can emit `trainer_change_log` entries into the same private storage, capturing observed patterns and proposed rubric or prompt adjustments. These logs act as a feedback channel for human prompt owners to refine training content without impacting live request latency.
+- **Separation of concerns:** Client logs avoid exposing identifiers or sensitive content; all prompt storage, versioning, and self-annealing artifacts remain server-side behind private networking and storage.

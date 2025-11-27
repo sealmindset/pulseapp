@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import SbnProgressBar from "@/components/SbnProgressBar";
+import PulseProgressBar from "@/components/SbnProgressBar";
 import { useSession } from "@/components/SessionContext";
 import { useRouter } from "next/navigation";
 
@@ -101,7 +101,7 @@ export default function SessionPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Session</h1>
 
-      <SbnProgressBar currentStep={1} />
+      <PulseProgressBar currentStep={1} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">

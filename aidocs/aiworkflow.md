@@ -9,6 +9,9 @@ This document describes the Agentic AI composition used by the PULSE Behavioral 
     - Behavioral Compliance Evaluator (BCE)
     - Methodology & Content Fidelity Checker (MCF)
     - Conversion & Psychological Outcome Assessor (CPO)
+- PULSE evaluator prompt (PULSE 0–3 scoring)
+  - docs/pulseagent.md — canonical evaluator/coach system prompt for PULSE 0–3 PULSE Selling scoring.
+  - aidocs/pulse_evaluator_prompt_seed.json — seed JSON for creating/updating the evaluator prompt via the Admin Prompts UI.
 - Next.js UI/UX (App Router)
   - ui/app/page.tsx (Pre‑Session)
   - ui/app/session/page.tsx (Session)
@@ -58,6 +61,11 @@ This document describes the Agentic AI composition used by the PULSE Behavioral 
 - Conversion & Psychological Outcome Assessor (CPO)
   - Focus: Urgency/FOMO, closing framework, financing pivots, ownership language, conversion outcome.
   - Output: Score + psychological tool usage + mandated conversion confirmation.
+
+- PULSE Evaluator (0–3 PULSE steps)
+  - Role: Single evaluator/coach agent using the PULSE Selling framework to produce 0–3 scores per step plus targeted coaching tips and an overall narrative summary.
+  - Input: Full session transcript and persona metadata (when available).
+  - Output: JSON matching `docs/pulseagent.md` (framework, scores for Probe/Understand/Link/Simplify/Earn with 0–3 `score`, `reason`, `tips[]`, and `overall_summary`).
 
 ## Application Workflows and Triggers
 

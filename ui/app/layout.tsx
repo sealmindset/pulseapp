@@ -3,6 +3,10 @@ import Link from "next/link";
 import "./globals.css";
 import { SessionProvider } from "@/components/SessionContext";
 
+const enableTraining =
+  process.env.NEXT_PUBLIC_ENABLE_TRAINING === "true" &&
+  process.env.NEXT_PUBLIC_ENV_NAME !== "prod";
+
 export const metadata: Metadata = {
   title: "PULSE Selling Behavioral Certification",
   description: "RESTRICTED IP: Hyper-Engineered Behavioral Sales (PULSE Selling, formerly SBN)",
@@ -19,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ul className="flex items-center gap-4 text-sm">
                 <li><Link href="/">Pre-Session</Link></li>
                 <li><Link href="/session">Session</Link></li>
+                {enableTraining && <li><Link href="/training">Training</Link></li>}
                 <li><Link href="/feedback">Feedback</Link></li>
                 <li><Link href="/admin">Admin</Link></li>
               </ul>

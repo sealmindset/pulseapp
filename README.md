@@ -184,6 +184,33 @@ UI features:
 - Transcript display and Complete Session action
 - Feedback page fetching score, rubric, and artifacts by `sessionId`
 
+## PULSE Trainer (Dev Preview)
+
+The PULSE Trainer Agent is exposed via a dedicated Training page and is intended for **non-production** and controlled pilots.
+
+- Path: `/training` (Next.js UI)
+- Trainer endpoint: `POST /trainer/pulse/step` (Function App)
+
+Gating:
+
+- **UI:**
+  - `NEXT_PUBLIC_ENABLE_TRAINING=true`
+  - `NEXT_PUBLIC_ENV_NAME!=prod`
+  - When enabled, the Training nav link appears and the `/training` page is active; when disabled, the page shows a simple notice.
+- **Orchestrator:**
+  - `PULSE_TRAINER_ENABLED=true` — required for the trainer function to call Azure OpenAI.
+  - When unset/false, the trainer returns a static-evaluation JSON `OUTPUT` indicating that training is disabled in this environment.
+
+Azure OpenAI requirements (in addition to the Terraform-provisioned settings):
+
+- `AZURE_OPENAI_API_KEY` — Azure OpenAI API key for the configured endpoint.
+- Deployed chat models referenced by:
+  - `OPENAI_ENDPOINT`
+  - `OPENAI_API_VERSION`
+  - `OPENAI_DEPLOYMENT_PERSONA_HIGH_REASONING` or `OPENAI_DEPLOYMENT_PERSONA_CORE_CHAT`
+
+The trainer is wired to the PULSE Selling framework and returns structured JSON for adaptive questioning, mastery estimates, and (optionally) self-annealing trainer change logs. In production environments, keep the trainer **disabled by default** and enable it only in explicitly approved scenarios.
+
 ## Admin (Dev Mode Prompt Editor)
 - Path: `/admin` (visible only when `NEXT_PUBLIC_ENABLE_ADMIN=true` and `NEXT_PUBLIC_ENV_NAME!=prod`)
 - Purpose: Edit agent configs and prompts during development without authentication. Hidden in production.

@@ -139,6 +139,7 @@
   - `diag_webapp (HTTPLogs, ConsoleLogs)` from Web App to Log Analytics.
   - `diag_functionapp (FunctionAppLogs, AppServiceHTTPLogs)` from Function App to Log Analytics.
 - These labels keep the rendered PNG/SVG/draw.io diagrams in sync with the actual Terraform diagnostics configuration and make it easier to reason about which logs are flowing where during PULSE training sessions.
+ - Further annotated the Function App node with its key HTTP routes (`/session/*`, `/audio/chunk`, `/trainer/pulse/step`, `/admin/*`) and expanded the Storage Account cluster to include `prompts` and `trainer-change-logs` containers so the diagram highlights the PULSE Trainer and evaluator surfaces without exposing application internals.
 
 ## 2025-11-27
 
@@ -146,3 +147,54 @@
 - Added minimal ESLint configuration file `ui/.eslintrc.json` extending `next/core-web-vitals` so that `next lint` runs non-interactively in both local and CI environments.
 - This prevents the Next.js ESLint setup wizard from prompting in GitHub Actions when `npm run lint` is executed, unblocking the `UI Lint & Build` job in `.github/workflows/ci-infra-ui.yml`.
 - No changes to the lint script itself (`"lint": "next lint"`); behavior is controlled via the new config file.
+
+### PULSE Trainer (Phase A Scaffold)
+- Added Azure Function HTTP endpoint `trainer_pulse_step` with route `POST /trainer/pulse/step` returning a stubbed PULSE Trainer Agent `OUTPUT` envelope for a single PULSE step, honoring the `adaptive_trainer.enabled` flag but not yet calling any LLM.
+- Added Next.js API proxy route `app/api/orchestrator/trainer/pulse/step/route.ts` that forwards JSON bodies to the Function App via `FUNCTION_APP_BASE_URL`, mirroring existing `/session/*` and `/feedback/*` proxy patterns and keeping CORS open for XHR.
+- Introduced a Training page `app/training/page.tsx` that exercises the trainer endpoint with a fixed Probe scenario, collects the learner’s verbal or free-text answer, and renders the stub diagnosis and next question for manual end-to-end testing before wiring in full LLM logic.
+- Refined the `/training` UX into a two-column layout that mirrors the planned production flow: left side for scenario and trainer question/answer, right side for Probe rubric (success criteria and common errors), trainer feedback, and a stub mastery status panel, so the visual structure is stable before LLM-powered behavior is enabled.
+
+### PULSE Trainer (Phase B LLM Wiring)
+- Updated `orchestrator/trainer_pulse_step/__init__.py` to call Azure OpenAI when `adaptive_trainer.enabled` is true, using `OPENAI_ENDPOINT`, `OPENAI_API_VERSION`, `AZURE_OPENAI_API_KEY`, and either `OPENAI_DEPLOYMENT_PERSONA_HIGH_REASONING` or `OPENAI_DEPLOYMENT_PERSONA_CORE_CHAT` to create a chat completion with a PULSE Trainer system prompt and `CONFIG`/`SESSION` JSON payload, requesting a strict JSON `OUTPUT` object matching the trainer schema.
+- Preserved static evaluation behavior when adaptive training is disabled and added a resilient fallback stub path that returns a deterministic `OUTPUT` envelope if the LLM call fails for any reason, so the `/training` page remains usable even without Azure OpenAI configuration.
+- Added `requests` to `orchestrator/requirements.txt` as the minimal dependency for performing Azure OpenAI REST calls from the Function App, without introducing a broader SDK dependency.
+
+### PULSE Trainer (Phase C Self-Annealing Logging)
+- Extended `orchestrator/trainer_pulse_step/__init__.py` with a `_maybe_log_trainer_change` helper that inspects the trainer’s JSON `OUTPUT` and, when `trainer_change_log.emit == true`, writes a structured log document to the prompts blob container under the `trainer-change-logs/` prefix, keyed by date, PULSE step, scenario id, and session id.
+- Logged payloads include timestamp, basic session identifiers, the runtime CONFIG, and the `trainer_change_log` object so that recurring patterns and proposed rubric/prompt/scenario changes can be reviewed offline and fed back into trainer SOPs, without impacting live request latency or requiring database schema changes.
+- Any failures in this logging path are caught and logged via `logging.exception` but do not affect the learner experience, keeping the self-annealing signal path best-effort and non-disruptive.
+
+### PULSE Trainer (Phase D Rollout & Gating)
+- Gated the Training nav and `/training` page behind `NEXT_PUBLIC_ENABLE_TRAINING` and `NEXT_PUBLIC_ENV_NAME!=prod` so that PULSE Training is only visible and usable in explicitly enabled non-production environments.
+- Added a `PULSE_TRAINER_ENABLED` Function App setting check in `trainer_pulse_step` so the backend must be explicitly turned on before calling Azure OpenAI; when disabled, the endpoint returns a static-evaluation `OUTPUT` indicating that the trainer is off for this environment.
+- Documented the PULSE Trainer dev-preview path, gating env vars, and Azure OpenAI configuration requirements in `README.md` so operators can safely enable or keep the trainer dark per environment.
+
+### PULSE Refactor (Phase 2 – Apply Across Code, UI, Docs, Prompts)
+- Updated remaining documentation prompts (`docs/aistudio.md`, `docs/explained.md`, `aidocs/simulation.md`, `aidocs/trainer_prompts.md`) so that the active sales methodology is consistently described as **PULSE Selling** rather than “Selling by Numbers”, avoiding restatement of proprietary legacy content.
+- Clarified the canonical five-step PULSE Selling framework (Probe, Understand, Link, Simplify, Earn) in docs where the methodology was previously framed as a six-step process.
+- Adjusted the session progress bar component naming to `PulseProgressBar` in the UI to better reflect the current methodology while keeping visual behavior unchanged.
+
+### PULSE Refactor (Phase 3 – Sanity Check & Tests)
+- Added orchestrator tests under `orchestrator/tests/test_trainer_pulse_step.py` to cover `trainer_pulse_step` behavior, including:
+  - CORS + preflight handling (OPTIONS) and method/JSON validation errors.
+  - Environment gating via `PULSE_TRAINER_ENABLED` (static-evaluation response when disabled).
+  - Static evaluation path when `adaptive_trainer.enabled` is false in the CONFIG.
+  - Resilient fallback behavior when the Azure OpenAI trainer call fails, ensuring a deterministic `OUTPUT` envelope is still returned.
+  - Self-annealing logging helper `_maybe_log_trainer_change`, verifying that no-op occurs when `emit=false` and that an appropriate blob path/payload is written when `emit=true`.
+- Introduced lightweight Jest + ts-jest configuration for the UI (`ui/jest.config.cjs`) and focused component tests in `ui/__tests__/` to validate:
+  - `/training` gating behavior based on `NEXT_PUBLIC_ENABLE_TRAINING` and `NEXT_PUBLIC_ENV_NAME` using server-side rendering of `TrainingPage`.
+  - `PulseProgressBar` rendering of the five PULSE Selling steps (Probe, Understand, Link, Simplify, Earn) on the Session page.
+
+### PULSE Evaluator Prompt (0–3 PULSE Scoring)
+- Promoted `docs/pulseagent.md` as the canonical system prompt for the evaluator/coach agent, defining a PULSE Selling-based 0–3 scoring scale per step and the exact JSON response contract expected from the evaluator.
+- Added implementation notes to `docs/pulseagent.md` documenting how to seed this prompt via the Admin Prompts UI, including `id`/`agentId` (`pulse-evaluator-v1`), `title` (`PULSE Evaluator (0–3 PULSE steps)`), and `type` (`system`), so operators can reliably create and update the prompt in each environment.
+- Introduced `aidocs/pulse_evaluator_prompt_seed.json` as a lightweight, copy-paste seed file that captures the evaluator prompt metadata and points back to `docs/pulseagent.md` for the full markdown body, aligning with the existing blob-backed prompts/versions infrastructure.
+- Updated `aidocs/aiworkflow.md` to reference the new PULSE Evaluator agent and its prompt locations, clarifying how it will be used by future `/feedback/{sessionId}` implementations alongside the existing BCE/MCF/CPO agent design.
+- Left the BCE/MCF/CPO orchestration schema (percentage scores and ≥0.85 pass threshold) unchanged for now, treating the PULSE Evaluator as a parallel, simpler scoring path that uses the new PULSE 0–3 JSON schema for post-session coaching.
+
+### Docs / Capabilities
+- Expanded `docs/capabilities.md` beyond audio/vocalization to describe how the platform’s Azure OpenAI and networking foundation now supports:
+  - The PULSE Trainer Agent dev-preview flow (`/training` + `POST /trainer/pulse/step`) for step-focused PULSE coaching with adaptive follow-ups, mastery estimates, and optional self-annealing `trainer_change_log` signals.
+  - The PULSE Evaluator/Coach capability built around a 0–3 PULSE step scoring schema and structured JSON feedback, seeded via the `pulse-evaluator-v1` system prompt defined in `docs/pulseagent.md` and managed through the Admin Prompts UI.
+  - Dev-mode Admin Prompt editing and versioned prompt storage on private Azure Blob, keeping RESTRICTED IP content server-side while enabling iterative improvement of training prompts and rubrics.
+
