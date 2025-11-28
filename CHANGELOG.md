@@ -198,3 +198,29 @@
   - The PULSE Evaluator/Coach capability built around a 0–3 PULSE step scoring schema and structured JSON feedback, seeded via the `pulse-evaluator-v1` system prompt defined in `docs/pulseagent.md` and managed through the Admin Prompts UI.
   - Dev-mode Admin Prompt editing and versioned prompt storage on private Azure Blob, keeping RESTRICTED IP content server-side while enabling iterative improvement of training prompts and rubrics.
 
+## 2025-11-28
+
+### Phase 0 – PULSE Training Business Readiness Assessment
+- Finalized `aidocs/phase0_sbn_training_assessment.md` as the canonical Phase 0 business readiness assessment for PULSE training, including a persona/outcome test matrix, flow checks, admin UX checklist, and infra/performance sanity criteria.
+- Added a 2025-11-28 preliminary assessment subsection to record a desk-based readiness review of this repo’s current contents (Terraform, orchestrator stubs, UI, and docs) without running the full simulation engine.
+- Determined that, based on this repo alone, the platform is **not yet ready** for a full PULSE training pilot because:
+  - Training orchestrator endpoints (`/session/start`, `/audio/chunk`, `/session/complete`, `/feedback/{sessionId}`) are referenced but their server implementations are not included here and must be supplied/deployed alongside the admin endpoints.
+  - BCE/MCF/CPO scoring and the full simulation engine exist only as documented prompt designs (no implemented pipeline or scorecard envelope in this codebase).
+  - The new PULSE 0–3 Evaluator/Coach prompt is defined and seeded but not yet wired into a live feedback pipeline.
+- Captured these gaps and the expected remediation steps (implement orchestrator endpoints, BCE/MCF/CPO pipeline, and evaluator integration, followed by targeted matrix runs) so future teams can re-run Phase 0 against a deployed environment and move confidently into hardened pilot phases.
+
+### Training/Evaluator Orchestrator (Phase A–C)
+- Phase A: Implemented core training/evaluator orchestrator endpoints in the Function App to back the existing UI proxies without introducing fake scoring data:
+  - `POST /session/start` creates a new session, persists a lightweight `sessions/{sessionId}/session.json` document to the prompts container (session metadata only), and returns `{ sessionId, avatarUrl: null }` with open CORS.
+  - `POST /session/complete` marks the session as completed in the same blob document and returns `204 No Content`, matching the UI’s expectations.
+  - `POST /audio/chunk` accepts audio requests and responds with an honest stub text when `TRAINING_ORCHESTRATOR_ENABLED=true`, and a clear 503 error when disabled; audio processing (STT/TTS) is intentionally deferred to later phases to avoid mock evaluation.
+  - `GET /feedback/{sessionId}` now returns a minimal feedback envelope containing `session` metadata and `artifacts.transcript` (when present), so the Feedback page can render artifacts even before scoring is wired.
+- Phase B: Introduced a BCE/MCF/CPO scorecard contract and consumption path without faking scores:
+  - Defined a scorecard blob contract at `sessions/{sessionId}/scorecard.json` with `overall`, `bce`, `mcf`, and `cpo` objects, each carrying a numeric `score` and optional `passed`/`summary` fields.
+  - Extended `feedback_session` to read this scorecard and map it into the UI’s flexible contract as `overallScore` and a `rubric` array (Behavioral Mastery/BCE, Methodology Fidelity/MCF, Conversion Outcome/CPO), while also returning the raw `scorecard` for downstream consumers.
+  - Left scorecard **generation** out of this repo per Phase 0 findings; external orchestrators or future Functions are responsible for writing `scorecard.json`, keeping this implementation honest and side-effect free when scores are not yet available.
+- Phase C: Integrated the PULSE 0–3 evaluator into the feedback flow behind strict env and config gating:
+  - Added `PULSE_EVALUATOR_ENABLED` and `PULSE_EVALUATOR_PROMPT_ID` gating so the evaluator only runs when explicitly enabled and configured.
+  - Implemented prompt loading from blob (`prompts/{id}.json`, default `pulse-evaluator-v1`) using the Admin-managed system prompt defined in `docs/pulseagent.md`.
+  - Implemented an Azure OpenAI chat completion call that sends the full session transcript and persona as JSON to the evaluator prompt and expects a strict JSON object (framework/scores/overall_summary) per the PULSE 0–3 schema.
+  - Wired `/feedback/{sessionId}` to attach the evaluator result under `pulseEvaluator` when enabled and a non-empty transcript is available; failures or missing config are logged server-side and simply omit the evaluator field, never returning fabricated feedback.
