@@ -8,6 +8,8 @@ import requests
 
 from shared_code.blob import read_json
 from shared_code.http import json_ok, no_content, text_error
+from shared_code.analytics_events import record_session_scorecard_event
+from shared_code.readiness_service import compute_and_store_user_readiness_for_session
 
 
 CORS_HEADERS = {
@@ -227,6 +229,15 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
             # Include raw scorecard for downstream consumers (e.g., admin or deeper UI views).
             body["scorecard"] = scorecard
+
+            # Record a longitudinal analytics event capturing the overall scorecard.
+            # This call is gated by PULSE_ANALYTICS_ENABLED inside analytics_events and
+            # will no-op when analytics are disabled or misconfigured.
+            record_session_scorecard_event(session_id, session_doc, scorecard)
+
+            # Compute and store a readiness snapshot for the associated user when
+            # readiness is enabled and a valid user_id is available on the session.
+            compute_and_store_user_readiness_for_session(session_doc)
     except Exception as exc:  # noqa: BLE001
         logging.exception("feedback_session: failed to interpret scorecard for session %s: %s", session_id, exc)
 

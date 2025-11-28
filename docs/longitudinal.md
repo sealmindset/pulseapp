@@ -248,3 +248,159 @@ Example structure for responses:
 Do NOT drift into generic advice. Everything you produce should move the PULSE app closer to having:
 - A working **Longitudinal Analytics Store**, and
 - A functioning **Readiness Score** that the trainer and UI can use.
+
+==================================================
+5. CURRENT IMPLEMENTATION SNAPSHOT (PHASE E/F)
+==================================================
+
+This section summarizes how the above design is currently implemented in the
+repo so you can orient yourself quickly when extending or debugging.
+
+**5.1 Schema & Persistence**
+
+- Canonical DDL: `setup/schema.sql`
+  - Schemas:
+    - `analytics` — storage tables
+    - `api` — PostgREST-facing views
+  - Tables (all with `id uuid primary key default gen_random_uuid()` and
+    `api_id bigserial unique`):
+    - `analytics.session_events`
+      - `user_id uuid`
+      - `session_id uuid`
+      - `occurred_at timestamptz`
+      - `scenario_id text`
+      - `pulse_step text`
+      - `skill_tag text`
+      - `score numeric(5,2)` (0–100)
+      - `raw_metrics jsonb`
+      - `notes text`
+    - `analytics.user_skill_agg`
+      - `user_id uuid`
+      - `skill_tag text`
+      - `window text` (e.g. `30d`)
+      - `avg_score numeric(5,2)`
+      - `sample_size integer`
+      - `last_updated timestamptz`
+      - Unique constraint on `(user_id, skill_tag, window)` supports upserts.
+    - `analytics.user_readiness`
+      - `user_id uuid`
+      - `snapshot_at timestamptz`
+      - `readiness_overall numeric(5,2)`
+      - `readiness_technical numeric(5,2)`
+      - `readiness_communication numeric(5,2)`
+      - `readiness_structure numeric(5,2)`
+      - `readiness_behavioral numeric(5,2)`
+      - `meta jsonb` (formula version, windows, weights, etc.)
+  - Views under `api.*` expose `api_id` as HTTP `id` while keeping UUID `id`
+    for internal joins, matching the PostgREST/UUID conventions described in
+    the global rules.
+
+Apply path:
+
+- Terraform provisions the `pulse_analytics` database and connection vars.
+- Operators can apply the schema with:
+  ```bash
+  psql "postgres://$PULSE_ANALYTICS_DB_USER:$PULSE_ANALYTICS_DB_PASSWORD@$PULSE_ANALYTICS_DB_HOST:5432/$PULSE_ANALYTICS_DB_NAME" \
+    -f setup/schema.sql
+  ```
+- Future schema changes should be expressed as incremental SQL under
+  `setup/migrations/` with backups taken before breaking changes.
+
+**5.2 Data Capture (Session Events)**
+
+- Analytics client: `orchestrator/shared_code/analytics_db.py`
+  - Builds a DSN from `PULSE_ANALYTICS_DB_HOST/PORT/NAME/USER/PASSWORD` and
+    exposes `get_connection()` using `psycopg[binary]`.
+
+- Event helper: `orchestrator/shared_code/analytics_events.py`
+  - Flag: `PULSE_ANALYTICS_ENABLED` (`true/1/yes` to enable).
+  - `record_session_scorecard_event(session_id, session_doc, scorecard)`:
+    - Extracts `overall.score` from the BCE/MCF/CPO scorecard written to
+      blob at `sessions/{sessionId}/scorecard.json`.
+    - Inserts a single `session_end` / `overall` row into
+      `analytics.session_events` with `raw_metrics` containing the full
+      scorecard JSON.
+  - `feedback_session` calls this helper after successfully loading a
+    non-empty scorecard; when the flag is off or config is missing, it is a
+    no-op.
+
+- Session identity:
+  - `orchestrator/session_start` now extracts an optional `userId`/`user_id`
+    from the request body (or `X-PULSE-User-Id` header), validates it as a UUID,
+    and persists it into the `sessions/{sessionId}/session.json` document as
+    `user_id` when valid.
+  - This `user_id` is the canonical learner identifier used by analytics and
+    readiness; sessions without a valid `user_id` still function but will not
+    participate in readiness aggregation.
+
+**5.3 Aggregation & Readiness Computation**
+
+- Readiness service: `orchestrator/shared_code/readiness_service.py`
+  - Flag: `PULSE_READINESS_ENABLED` (`true/1/yes` to enable).
+  - Windows:
+    - Currently fixed to a `30d` lookback window (`_AGG_WINDOW_NAME = "30d"`).
+  - Skill-tag to component mapping:
+    - `technical_depth` → `readiness_technical`
+    - `communication` → `readiness_communication`
+    - `structure` → `readiness_structure`
+    - `behavioral_examples` → `readiness_behavioral`
+  - Weights (configurable constants):
+    - Technical 0.3, Communication 0.3, Structure 0.2, Behavioral 0.2.
+  - Core functions:
+    - `_compute_skill_aggregates(cur, user_id)` — aggregates
+      `analytics.session_events` for last 30 days by `skill_tag`.
+    - `_upsert_user_skill_agg(cur, user_id, aggregates)` — upserts into
+      `analytics.user_skill_agg` for window `30d`.
+    - `_compute_components_from_aggregates(...)` — turns aggregates into
+      component scores and optional `overall_from_events` when an
+      `overall` skill tag is present.
+    - `_compute_overall_from_components(...)` — computes a weighted
+      `readiness_overall` from available components, falling back to
+      `overall_from_events` when necessary.
+    - `compute_and_store_user_readiness(user_id)` — orchestrates the full
+      pipeline and inserts a snapshot into `analytics.user_readiness` with
+      `meta` documenting formula/window.
+    - `compute_and_store_user_readiness_for_session(session_doc)` — extracts
+      a valid UUID `user_id` from the session doc and delegates, acting as
+      the orchestrator integration point.
+  - Current hook:
+    - `feedback_session` calls
+      `compute_and_store_user_readiness_for_session(session_doc)` after
+      recording a scorecard event so that each scored session can produce a
+      readiness snapshot for that user.
+    - The helper only runs when the session document carries a valid UUID
+      `user_id`, ensuring that readiness snapshots are always associated with a
+      stable learner identity.
+
+**5.4 APIs & UI Hooks**
+
+- Orchestrator HTTP APIs:
+  - `GET /readiness/{userId}` (`orchestrator/readiness`)
+    - Returns `{ userId, latest, history[] }` from `analytics.user_readiness`.
+  - `GET /readiness/{userId}/skills` (`orchestrator/readiness_skills`)
+    - Returns `{ userId, window, skills[] }` from `analytics.user_skill_agg`
+      for window `30d`.
+
+- Next.js proxy routes under `ui/app/api/orchestrator`:
+  - `/readiness/[userId]` → Function App `/readiness/{userId}`.
+  - `/readiness/[userId]/skills` → Function App `/readiness/{userId}/skills`.
+
+- UI components/hooks:
+  - `ui/components/useReadiness.ts` — `useReadiness(userId)` hook used by
+    the card.
+  - `ui/components/ReadinessCard.tsx` — minimal readiness progress card that
+    shows the latest readiness overall (0–100) with a coarse band label and
+    the four component scores.
+  - `ui/app/feedback/page.tsx` — optionally renders `ReadinessCard` in the
+    right-hand column when `NEXT_PUBLIC_PULSE_READINESS_USER_ID` is set,
+    allowing opt-in pilot visualization for a specific debug user.
+  - `ui/app/page.tsx` (Pre-Session) can be configured with a pilot learner ID
+    by setting `NEXT_PUBLIC_PULSE_USER_ID` (or
+    `NEXT_PUBLIC_PULSE_READINESS_USER_ID`), which is passed as `userId` in the
+    `/session/start` payload and becomes the UUID `user_id` used by the
+    readiness pipeline.
+
+This implementation deliberately keeps analytics and readiness **opt-in** via
+environment flags and a simple debug user-id gate on the UI so that early
+pilots can collect longitudinal data and visualize readiness without
+impacting the core BCE/MCF/CPO feedback flow.

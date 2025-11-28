@@ -62,3 +62,13 @@ output "app_insights_connection_string" {
   description = "Application Insights connection string."
   value       = azurerm_application_insights.app_insights.connection_string
 }
+
+output "analytics_pg_fqdn" {
+  description = "FQDN of the analytics PostgreSQL flexible server."
+  value       = module.analytics_postgres.analytics_pg_fqdn
+}
+
+output "analytics_pg_database_name" {
+  description = "Name of the analytics PostgreSQL database."
+  value       = module.analytics_postgres.analytics_pg_database_name
+}

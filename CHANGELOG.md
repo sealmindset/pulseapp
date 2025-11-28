@@ -224,3 +224,73 @@
   - Implemented prompt loading from blob (`prompts/{id}.json`, default `pulse-evaluator-v1`) using the Admin-managed system prompt defined in `docs/pulseagent.md`.
   - Implemented an Azure OpenAI chat completion call that sends the full session transcript and persona as JSON to the evaluator prompt and expects a strict JSON object (framework/scores/overall_summary) per the PULSE 0–3 schema.
   - Wired `/feedback/{sessionId}` to attach the evaluator result under `pulseEvaluator` when enabled and a non-empty transcript is available; failures or missing config are logged server-side and simply omit the evaluator field, never returning fabricated feedback.
+
+### Analytics PostgreSQL (Longitudinal Store & Readiness DB)
+- Added a dedicated `analytics_postgres` Terraform module under `modules/analytics_postgres` that provisions an Azure Database for PostgreSQL Flexible Server as the **system of record** for longitudinal training analytics and readiness snapshots:
+  - Creates a delegated subnet `PULSE-analytics-pg-subnet` in the existing VNet using `Microsoft.DBforPostgreSQL/flexibleServers` delegation.
+  - Creates a private DNS zone `privatelink.postgres.database.azure.com` and links it to the PULSE VNet so the Web App and Function App can resolve the Postgres FQDN privately.
+  - Provisions a private-only PostgreSQL Flexible Server (`pg-<project>-analytics-<env>`) with configurable version, SKU, storage, and backup retention, plus a dedicated `pulse_analytics` database.
+- Wired the new module into `main.tf` with explicit sizing and credential variables:
+  - `analytics_pg_subnet_prefix`, `analytics_pg_version`, `analytics_pg_sku_name`, `analytics_pg_storage_mb`, `analytics_pg_backup_retention_days`.
+  - `analytics_pg_admin_username`, `analytics_pg_admin_password` (sensitive, supplied via `*.tfvars` or secret store only).
+- Exposed non-sensitive connection details via Terraform outputs for operators and tooling:
+  - `analytics_pg_fqdn` and `analytics_pg_database_name`.
+- Plumbed analytics connection details into the Web App and Function App as environment variables so backend services can build a `PULSE_ANALYTICS_DATABASE_URL` at runtime and target the analytics database for:
+  - Longitudinal Analytics Store tables (e.g., `session_events`, `user_skill_agg`).
+  - Readiness snapshot tables (e.g., `user_readiness`).
+  - `PULSE_ANALYTICS_DB_HOST`, `PULSE_ANALYTICS_DB_PORT`, `PULSE_ANALYTICS_DB_NAME`, `PULSE_ANALYTICS_DB_USER`, `PULSE_ANALYTICS_DB_PASSWORD`.
+- Left schema creation and migrations to the application layer so that analytics tables can evolve via normal migration tooling while Terraform owns only the server, subnet, DNS, and base database.
+
+### Longitudinal Analytics Store & Readiness Score (Phase E/F Implementation)
+- Added canonical analytics schema under `setup/schema.sql` for the dedicated `pulse_analytics` PostgreSQL database:
+  - Schemas: `analytics` (storage) and `api` (PostgREST-facing views).
+  - Tables (all with `id uuid primary key default gen_random_uuid()` and `api_id bigserial unique` as per PostgREST/UUID conventions):
+    - `analytics.session_events` — per-user / per-session / per-skill events with `user_id`, `session_id`, `occurred_at`, `scenario_id`, `pulse_step`, `skill_tag`, `score` (0–100), `raw_metrics` (JSONB), and `notes`.
+    - `analytics.user_skill_agg` — rolling aggregates by `user_id` + `skill_tag` + `window` (e.g., `30d`) with `avg_score`, `sample_size`, `last_updated`, and a unique constraint on `(user_id, skill_tag, window)` to support upserts.
+    - `analytics.user_readiness` — readiness snapshots over time with `user_id`, `snapshot_at`, `readiness_overall`, component fields (`readiness_technical`, `readiness_communication`, `readiness_structure`, `readiness_behavioral`), and `meta` (JSONB for formula/windows).
+  - Views in `api.*` expose `api_id` as external `id` and include `uuid` as a separate column, keeping internal joins on UUIDs while supporting numeric IDs at the PostgREST HTTP boundary.
+- Documented schema application and migration strategy in `setup/README.md`:
+  - For a fresh analytics DB, run `psql` against `pulse_analytics` with `setup/schema.sql` using the analytics env vars provisioned by Terraform.
+  - For future changes, use incremental SQL under `setup/migrations/` and keep `schema.sql` in sync with the current desired state, taking backups before any breaking change.
+- Implemented a lightweight analytics/Postgres client and event helper in the orchestrator:
+  - `orchestrator/shared_code/analytics_db.py` builds a DSN from `PULSE_ANALYTICS_DB_HOST/NAME/USER/PASSWORD/PORT` and exposes a `get_connection()` context manager using `psycopg[binary]` for short-lived read/write operations.
+  - `orchestrator/shared_code/analytics_events.py` adds `record_session_scorecard_event(session_id, session_doc, scorecard)` which, when `PULSE_ANALYTICS_ENABLED=true`, inserts a single `session_end`/`overall` row into `analytics.session_events` with the full scorecard stored in `raw_metrics` for later longitudinal analysis.
+  - `feedback_session` now calls `record_session_scorecard_event` after successfully loading and mapping a non-empty BCE/MCF/CPO scorecard, remaining a no-op when analytics are disabled or misconfigured.
+- Implemented a readiness aggregation service to compute and persist readiness snapshots:
+  - `orchestrator/shared_code/readiness_service.py` provides:
+    - `compute_and_store_user_readiness(user_id)` which, when `PULSE_READINESS_ENABLED=true`,
+      - Reads `analytics.session_events` for the user over the last 30 days,
+      - Aggregates by `skill_tag` into `analytics.user_skill_agg` (window `30d`) via upsert,
+      - Maps skill tags to readiness components (`technical_depth`, `communication`, `structure`, `behavioral_examples`),
+      - Computes component averages and an overall readiness score using configurable weights,
+      - Inserts a snapshot into `analytics.user_readiness` with a `meta` JSON documenting formula version, window, and weights.
+    - `compute_and_store_user_readiness_for_session(session_doc)` which extracts a `user_id` from the session (valid UUID only) and delegates to the above, acting as a safe, id-aware entrypoint for orchestrator endpoints.
+  - `feedback_session` invokes `compute_and_store_user_readiness_for_session(session_doc)` after recording the scorecard event, so each scored session can produce a new readiness snapshot for that user when flags and IDs are present.
+- Added dedicated readiness/query endpoints in the orchestrator and wired them through the UI:
+  - `orchestrator/readiness` (`GET /readiness/{userId}`): returns the latest and recent readiness snapshots for a user (`latest` + `history`), reading from `analytics.user_readiness` and enforcing the same `TRAINING_ORCHESTRATOR_ENABLED` gating used elsewhere.
+  - `orchestrator/readiness_skills` (`GET /readiness/{userId}/skills`): returns skill-level aggregates from `analytics.user_skill_agg` for the `30d` window, suitable for trend/breakdown views.
+  - Next.js proxy routes:
+    - `ui/app/api/orchestrator/readiness/[userId]/route.ts` → proxies to `/readiness/{userId}`.
+    - `ui/app/api/orchestrator/readiness/[userId]/skills/route.ts` → proxies to `/readiness/{userId}/skills`.
+- Introduced a minimal Readiness UI surface on the Feedback page:
+  - `ui/components/useReadiness.ts` exposes `useReadiness(userId)` which fetches `/api/orchestrator/readiness/{userId}` and returns `{ loading, error, data }` with a strongly typed readiness history.
+  - `ui/components/ReadinessCard.tsx` renders an experimental “Readiness (Pilot)” card showing the latest overall readiness score (0–100) with a coarse band label (“Strong” / “Emerging” / “Early”) and per-component scores (Technical, Communication, Structure, Behavioral).
+  - `ui/app/feedback/page.tsx` optionally includes `<ReadinessCard userId={readinessUserId} />` in the right-hand column when `NEXT_PUBLIC_PULSE_READINESS_USER_ID` is set, keeping readiness display opt-in and scoped to specific test users during pilot.
+- Added orchestrator tests for analytics and readiness paths in `orchestrator/tests/test_analytics_readiness.py`:
+  - Verify that analytics and readiness helpers respect `PULSE_ANALYTICS_ENABLED` and `PULSE_READINESS_ENABLED` flags and do not open DB connections when disabled.
+  - Confirm that `record_session_scorecard_event` produces the expected INSERT payload into `analytics.session_events` when enabled.
+  - Validate that `compute_and_store_user_readiness` computes weighted readiness correctly from mocked aggregates and attempts an INSERT into `analytics.user_readiness`.
+  - Exercise the new `/readiness/{userId}` and `/readiness/{userId}/skills` endpoints with mocked connections, asserting that they return the expected JSON envelopes.
+  - Note: running these tests locally requires installing `azure-functions` and `psycopg[binary]` into a virtualenv (use `pip install -r orchestrator/requirements.txt`) before invoking `python -m unittest discover orchestrator/tests`.
+
+## 2025-11-28
+
+### Readiness Identity & user_id Threading
+- Tightened readiness behavior to rely on a real, stable `user_id` rather than implicit or synthetic identifiers:
+  - `orchestrator/session_start` now extracts an optional `userId`/`user_id` field from the request body or an `X-PULSE-User-Id` header, validates that it is a UUID, and persists it into `sessions/{sessionId}/session.json` as `user_id` when valid.
+  - Readiness aggregation (`compute_and_store_user_readiness_for_session`) continues to operate only when a valid UUID `user_id` is present on the session document, ensuring readiness snapshots are always keyed to a stable learner identity.
+- Added a minimal pilot identity mapping in the Pre-Session UI so longitudinal analytics and readiness can be exercised without a full auth stack:
+  - `ui/app/page.tsx` now reads an optional `NEXT_PUBLIC_PULSE_USER_ID` (or falls back to `NEXT_PUBLIC_PULSE_READINESS_USER_ID`) and, when present, passes it as `userId` in the `/api/orchestrator/session/start` payload.
+  - This value is treated as a UUID and becomes the canonical `user_id` used by analytics/readiness for that learner during pilots.
+- Extended orchestrator tests to cover the new identity behavior:
+  - `orchestrator/tests/test_session_endpoints.py` now verifies that when `session_start` receives a `userId` in the request body, it persists the corresponding `user_id` into the blob-backed session document via `write_json`, without changing the response contract expected by the UI.

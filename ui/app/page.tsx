@@ -14,6 +14,11 @@ export default function PreSessionPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Optional pilot user id used to tag analytics/readiness. In a real
+  // deployment this would come from auth; here we allow a debug UUID via env.
+  const readinessUserId =
+    process.env.NEXT_PUBLIC_PULSE_USER_ID || process.env.NEXT_PUBLIC_PULSE_READINESS_USER_ID || null;
+
   const startSession = async () => {
     setError(null);
     if (!persona) {
@@ -26,10 +31,14 @@ export default function PreSessionPage() {
     }
     setLoading(true);
     try {
+      const payload: any = { persona, filters, prerequisitesAccepted: true };
+      if (readinessUserId) {
+        payload.userId = readinessUserId;
+      }
       const res = await fetch("/api/orchestrator/session/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ persona, filters, prerequisitesAccepted: true }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`Failed to start session (${res.status})`);
       const json = await res.json();

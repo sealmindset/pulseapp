@@ -197,3 +197,44 @@ variable "web_app_linux_fx_version" {
   description = "Linux FX version string for Web App runtime (e.g. NODE|18-lts or PYTHON|3.11)."
   default     = "NODE|18-lts"
 }
+
+variable "analytics_pg_subnet_prefix" {
+  type        = string
+  description = "Address prefix for the analytics PostgreSQL subnet."
+  default     = "10.10.3.0/24"
+}
+
+variable "analytics_pg_version" {
+  type        = string
+  description = "PostgreSQL engine version for the analytics database."
+  default     = "16"
+}
+
+variable "analytics_pg_sku_name" {
+  type        = string
+  description = "SKU name for the analytics PostgreSQL flexible server."
+  default     = "GP_Standard_D2s_v3"
+}
+
+variable "analytics_pg_storage_mb" {
+  type        = number
+  description = "Allocated storage in MB for the analytics PostgreSQL flexible server."
+  default     = 32768
+}
+
+variable "analytics_pg_backup_retention_days" {
+  type        = number
+  description = "Backup retention in days for the analytics PostgreSQL flexible server."
+  default     = 7
+}
+
+variable "analytics_pg_admin_username" {
+  type        = string
+  description = "Administrator username for the analytics PostgreSQL flexible server."
+}
+
+variable "analytics_pg_admin_password" {
+  type        = string
+  description = "Administrator password for the analytics PostgreSQL flexible server."
+  sensitive   = true
+}

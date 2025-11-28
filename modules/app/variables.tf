@@ -110,3 +110,24 @@ variable "scenario_process_pipeline" {
   description = "Scenario process pipeline identifier."
   default     = "PULSE-SIX-STEP"
 }
+
+variable "analytics_pg_fqdn" {
+  type        = string
+  description = "FQDN of the analytics PostgreSQL flexible server."
+}
+
+variable "analytics_pg_database_name" {
+  type        = string
+  description = "Name of the analytics PostgreSQL database."
+}
+
+variable "analytics_pg_admin_username" {
+  type        = string
+  description = "Administrator username for the analytics PostgreSQL flexible server."
+}
+
+variable "analytics_pg_admin_password" {
+  type        = string
+  description = "Administrator password for the analytics PostgreSQL flexible server."
+  sensitive   = true
+}

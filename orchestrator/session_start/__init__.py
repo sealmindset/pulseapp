@@ -33,6 +33,34 @@ def _orchestrator_enabled() -> bool:
     return value in ("true", "1", "yes")
 
 
+def _extract_user_id(req: func.HttpRequest, body: Dict[str, Any]) -> str | None:
+    """Extract an optional user_id UUID from the request.
+
+    This is intentionally soft-fail: if userId is missing or invalid, we
+    simply return None and the session proceeds without a user_id attached.
+    Readiness and analytics layers will only operate when a valid UUID is
+    present.
+    """
+
+    raw: Any = None
+    if isinstance(body, dict):
+        raw = body.get("userId") or body.get("user_id")
+    if not raw:
+        raw = req.headers.get("X-PULSE-User-Id")
+
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+
+    candidate = raw.strip()
+    try:
+        uuid.UUID(candidate)
+    except ValueError:
+        logging.warning("session_start: ignoring invalid userId '%s'", candidate)
+        return None
+
+    return candidate
+
+
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info("session_start request: %s", req.method)
 
@@ -55,6 +83,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         return _error("Invalid JSON", 400)
 
     persona = body.get("persona") if isinstance(body, dict) else None
+    user_id = _extract_user_id(req, body)
 
     session_id = str(uuid.uuid4())
     doc: Dict[str, Any] = {
@@ -64,6 +93,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         "request": body,
         "status": "active",
     }
+
+    if user_id is not None:
+        doc["user_id"] = user_id
 
     try:
         write_json(f"sessions/{session_id}/session.json", doc)

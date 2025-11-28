@@ -3,12 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession } from "@/components/SessionContext";
+import { ReadinessCard } from "@/components/ReadinessCard";
 
 export default function FeedbackPage() {
   const { sessionId } = useSession();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<any>(null);
+
+  // Optional debug user id for showing readiness; if not set, readiness is hidden.
+  const readinessUserId = process.env.NEXT_PUBLIC_PULSE_READINESS_USER_ID || null;
 
   useEffect(() => {
     let cancelled = false;
@@ -79,7 +83,7 @@ export default function FeedbackPage() {
             </div>
           </div>
         </div>
-        <div>
+        <div className="space-y-4">
           <div className="rounded border border-gray-200 p-4">
             <div className="text-lg font-medium">Artifacts</div>
             <div className="mt-2 space-y-3 text-sm text-gray-700">
@@ -116,6 +120,7 @@ export default function FeedbackPage() {
               })()}
             </div>
           </div>
+          {readinessUserId && <ReadinessCard userId={readinessUserId} />}
         </div>
       </div>
     </div>

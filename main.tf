@@ -227,6 +227,30 @@ resource "azurerm_application_insights" "app_insights" {
 }
 
 ########################
+# Analytics PostgreSQL (Longitudinal & Readiness)
+########################
+
+module "analytics_postgres" {
+  source              = "./modules/analytics_postgres"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  project_name        = var.project_name
+  environment         = var.environment
+  common_tags         = local.common_tags
+
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  virtual_network_id   = azurerm_virtual_network.vnet.id
+
+  analytics_pg_subnet_prefix        = var.analytics_pg_subnet_prefix
+  analytics_pg_version              = var.analytics_pg_version
+  analytics_pg_sku_name             = var.analytics_pg_sku_name
+  analytics_pg_storage_mb           = var.analytics_pg_storage_mb
+  analytics_pg_backup_retention_days = var.analytics_pg_backup_retention_days
+  analytics_pg_admin_username       = var.analytics_pg_admin_username
+  analytics_pg_admin_password       = var.analytics_pg_admin_password
+}
+
+########################
 # Web App + Function App (via module "app")
 ########################
 
@@ -256,6 +280,11 @@ module "app" {
   storage_interaction_logs_container        = azurerm_storage_container.interaction_logs.name
 
   app_insights_connection_string = azurerm_application_insights.app_insights.connection_string
+
+  analytics_pg_fqdn           = module.analytics_postgres.analytics_pg_fqdn
+  analytics_pg_database_name  = module.analytics_postgres.analytics_pg_database_name
+  analytics_pg_admin_username = var.analytics_pg_admin_username
+  analytics_pg_admin_password = var.analytics_pg_admin_password
 
   behavioral_mastery_threshold = var.behavioral_mastery_threshold
 }

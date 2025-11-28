@@ -50,6 +50,12 @@ resource "azurerm_linux_web_app" "PULSE_ui_api" {
     "STORAGE_INTERACTION_LOGS_CONTAINER" = var.storage_interaction_logs_container
 
     "BEHAVIORAL_MASTERY_THRESHOLD"       = tostring(var.behavioral_mastery_threshold)
+
+    "PULSE_ANALYTICS_DB_HOST"     = var.analytics_pg_fqdn
+    "PULSE_ANALYTICS_DB_PORT"     = "5432"
+    "PULSE_ANALYTICS_DB_NAME"     = var.analytics_pg_database_name
+    "PULSE_ANALYTICS_DB_USER"     = var.analytics_pg_admin_username
+    "PULSE_ANALYTICS_DB_PASSWORD" = var.analytics_pg_admin_password
   }
 
   tags = merge(var.common_tags, { service_role = "ui-api" })
@@ -99,6 +105,12 @@ resource "azurerm_linux_function_app" "scenario_orchestrator" {
 
     "SCENARIO_PROCESS_PIPELINE"          = var.scenario_process_pipeline
     "BEHAVIORAL_MASTERY_THRESHOLD"       = tostring(var.behavioral_mastery_threshold)
+
+    "PULSE_ANALYTICS_DB_HOST"     = var.analytics_pg_fqdn
+    "PULSE_ANALYTICS_DB_PORT"     = "5432"
+    "PULSE_ANALYTICS_DB_NAME"     = var.analytics_pg_database_name
+    "PULSE_ANALYTICS_DB_USER"     = var.analytics_pg_admin_username
+    "PULSE_ANALYTICS_DB_PASSWORD" = var.analytics_pg_admin_password
   }
 
   tags = merge(var.common_tags, { service_role = "scenario-orchestrator" })

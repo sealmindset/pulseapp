@@ -38,6 +38,20 @@ class SessionStartTests(unittest.TestCase):
         self.assertIn("avatarUrl", data)
         write_mock.assert_called_once()
 
+    @mock.patch.dict(os.environ, {"TRAINING_ORCHESTRATOR_ENABLED": "true"}, clear=False)
+    @mock.patch.object(session_start, "write_json")
+    def test_session_start_persists_user_id_when_provided(self, write_mock: mock.Mock) -> None:
+        body = {"persona": "Thinker", "userId": "11111111-1111-1111-1111-111111111111"}
+        req = make_json_request("/session/start", body)
+
+        resp = session_start.main(req)
+
+        self.assertEqual(resp.status_code, 200)
+        write_mock.assert_called_once()
+        _path, doc = write_mock.call_args.args
+        assert isinstance(doc, dict)
+        self.assertEqual(doc.get("user_id"), "11111111-1111-1111-1111-111111111111")
+
     @mock.patch.dict(os.environ, {"TRAINING_ORCHESTRATOR_ENABLED": "false"}, clear=False)
     def test_session_start_disabled_returns_503(self) -> None:
         body = {"persona": "Thinker"}

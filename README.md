@@ -108,6 +108,14 @@ Key variables (see `variables.tf` for full list and defaults):
 - `behavioral_mastery_threshold` — Must be between 0.85–1.0 (default 0.85)
 - `enable_webapp_private_endpoint` — Toggle Web App Private Endpoint (default true)
 - `web_app_linux_fx_version` — Runtime (default `NODE|18-lts`)
+- Analytics PostgreSQL (longitudinal & readiness):
+  - `analytics_pg_subnet_prefix` — CIDR for analytics Postgres subnet (default `10.10.3.0/24`)
+  - `analytics_pg_version` — Postgres engine version (default `16`)
+  - `analytics_pg_sku_name` — Flexible Server SKU for analytics (default `GP_Standard_D2s_v3`)
+  - `analytics_pg_storage_mb` — Storage in MB (default `32768`)
+  - `analytics_pg_backup_retention_days` — Backup retention in days (default `7`)
+  - `analytics_pg_admin_username` — Admin username for analytics Postgres (required)
+  - `analytics_pg_admin_password` — Admin password for analytics Postgres (required, sensitive)
 
 Example `prod.tfvars`:
 ```hcl
@@ -247,11 +255,39 @@ Admin endpoints (implemented in `/orchestrator`):
 - `GET      /admin/prompts/{id}/versions`
 - `GET      /admin/prompts/{id}/versions/{version}`
 
+Analytics & Readiness
+--------------------
+
+- `PULSE_ANALYTICS_ENABLED` — when `true/1/yes`, enables writing session scorecard events into the analytics Postgres `session_events` table.
+- `PULSE_READINESS_ENABLED` — when `true/1/yes`, enables the readiness aggregation service to compute `user_skill_agg` and `user_readiness` snapshots for users with a valid `user_id`.
+
 Function App settings (dev mode):
 - `ADMIN_EDIT_ENABLED=true` (enables write ops on admin endpoints in dev)
 - `PROMPTS_CONTAINER=prompts` (optional; defaults to `prompts`)
 - Storage connection string: one of is required
   - `BLOB_CONN_STRING` or `AZURE_STORAGE_CONNECTION_STRING` or `AzureWebJobsStorage`
+ - Analytics Postgres (longitudinal + readiness):
+   - `PULSE_ANALYTICS_DB_HOST`, `PULSE_ANALYTICS_DB_PORT`, `PULSE_ANALYTICS_DB_NAME`, `PULSE_ANALYTICS_DB_USER`, `PULSE_ANALYTICS_DB_PASSWORD`
+   - These are populated by Terraform from the analytics Postgres Flexible Server and are intended for Longitudinal Analytics Store and Readiness Score schemas (e.g., `session_events`, `user_skill_agg`, `user_readiness`).
+  - Analytics / Readiness feature flags (pilot):
+    - `PULSE_ANALYTICS_ENABLED` — when `true/1/yes`, enables writing session
+      scorecard events into the analytics Postgres `session_events` table.
+    - `PULSE_READINESS_ENABLED` — when `true/1/yes`, enables the readiness
+      aggregation service to compute `user_skill_agg` and `user_readiness`
+      snapshots for users with a valid `user_id`.
+
+Identity and pilot user_id configuration:
+- The orchestrator extracts an optional `userId`/`user_id` from the
+  `/session/start` request body (or an `X-PULSE-User-Id` header), validates it
+  as a UUID, and persists it into the session document as `user_id` when
+  present.
+- Readiness aggregation only runs when a valid UUID `user_id` is available,
+  ensuring snapshots are always tied to a stable learner identity.
+- For pilots without a full auth stack, the Pre-Session UI can be configured to
+  send a fixed UUID per learner by setting:
+  - `NEXT_PUBLIC_PULSE_USER_ID` (preferred), or
+  - `NEXT_PUBLIC_PULSE_READINESS_USER_ID` (also used by the Feedback
+    Readiness card).
 
 Quick tests (replace base URL):
 ```bash
@@ -276,6 +312,37 @@ python3 docs/PULSE_network_diagram.py --tf-path . --drawio --output-basename PUL
 ```
 
 Requires Graphviz and `diagrams` package.
+
+## Analytics Schema (Quick Reference)
+
+The analytics PostgreSQL database (`pulse_analytics`) is provisioned by
+Terraform, but its tables are owned by the application so they can evolve via
+normal migrations.
+
+- Canonical DDL lives in `setup/schema.sql` and creates:
+  - `analytics.session_events` — per-session / per-skill events.
+  - `analytics.user_skill_agg` — rolling aggregates per user/skill/window.
+  - `analytics.user_readiness` — readiness snapshots over time.
+  - `api.*` views that expose numeric `id` (from `api_id`) for PostgREST while
+    preserving UUIDs for internal joins.
+- To apply the schema to a fresh analytics database, use the analytics
+  connection vars exported to the Function App/Web App:
+
+  ```bash
+  export PULSE_ANALYTICS_DB_HOST="<server>.postgres.database.azure.com"
+  export PULSE_ANALYTICS_DB_NAME="pulse_analytics"
+  export PULSE_ANALYTICS_DB_USER="<user>"
+  export PULSE_ANALYTICS_DB_PASSWORD="<password>"
+
+  psql "postgres://$PULSE_ANALYTICS_DB_USER:$PULSE_ANALYTICS_DB_PASSWORD@$PULSE_ANALYTICS_DB_HOST:5432/$PULSE_ANALYTICS_DB_NAME" \
+    -f setup/schema.sql
+  ```
+
+Once schema is applied and the `PULSE_ANALYTICS_ENABLED` /
+`PULSE_READINESS_ENABLED` flags are set, the orchestrator will begin writing
+scorecard events and computing readiness snapshots (when a valid `user_id`
+is available on sessions), and the optional Readiness card on the Feedback
+page can be enabled via `NEXT_PUBLIC_PULSE_READINESS_USER_ID`.
 
 ## Troubleshooting
 - 403/404 from Function App: Confirm `FUNCTION_APP_BASE_URL` and that the orchestrator is deployed and reachable.

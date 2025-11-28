@@ -11,6 +11,7 @@ from diagrams.azure.web import AppServices, AppServicePlans
 from diagrams.azure.compute import FunctionApps
 from diagrams.azure.monitor import Logs
 from diagrams.azure.devops import ApplicationInsights
+from diagrams.azure.database import DatabaseForPostgresqlServers
 
 
 def build_topology():
@@ -40,17 +41,28 @@ def build_topology():
                 pe_subnet - Edge(label="hosts") - pe_blob
                 pe_subnet - Edge(label="hosts") - pe_web
 
+            with Cluster("Analytics Subnet: PULSE-analytics-pg-subnet (10.10.3.0/24)"):
+                analytics_subnet = Subnets("Subnet: PULSE-analytics-pg-subnet")
+                analytics_pg = DatabaseForPostgresqlServers(
+                    "Analytics PostgreSQL Flexible Server\n"
+                    "(pg-PULSE-training-analytics-<env>)"
+                )
+                analytics_subnet - Edge(label="hosts") - analytics_pg
+
         # Private DNS zones and VNet links
         with Cluster("Private DNS Zones + VNet Links"):
             vnet_node = VirtualNetworks("Virtual Network")
             dns_openai = DNSPrivateZones("Zone: privatelink.openai.azure.com")
             dns_blob = DNSPrivateZones("Zone: privatelink.blob.core.windows.net")
             dns_web = DNSPrivateZones("Zone: privatelink.azurewebsites.net (optional)")
+            dns_pg = DNSPrivateZones("Zone: privatelink.postgres.database.azure.com")
             vnet_node - Edge(label="contains") - app_subnet
             vnet_node - Edge(label="contains") - pe_subnet
+            vnet_node - Edge(label="contains") - analytics_subnet
             dns_openai - Edge(label="vnet link") - vnet_node
             dns_blob - Edge(label="vnet link") - vnet_node
             dns_web - Edge(label="vnet link (optional)") - vnet_node
+            dns_pg - Edge(label="vnet link") - vnet_node
 
         # Azure OpenAI account and deployments
         with Cluster("Azure OpenAI: Cognitive Account + Deployments"):
@@ -91,6 +103,10 @@ def build_topology():
 
         # Function App talks to Storage using connection string (AzureWebJobsStorage)
         func >> Edge(label="AzureWebJobsStorage") >> storage
+
+        # App Services use analytics PostgreSQL via VNet + private DNS (no public access)
+        web >> Edge(label="PULSE_ANALYTICS_DB_HOST") >> analytics_pg
+        func >> Edge(label="PULSE_ANALYTICS_DB_HOST") >> analytics_pg
 
         # Optional Web App Private Endpoint (enable_webapp_private_endpoint)
         web >> Edge(label="Private Endpoint (optional)") >> pe_web
@@ -183,6 +199,7 @@ def render_drawio(output_basename: str) -> None:
     add_vertex("vnet", "Virtual Network: vnet-PULSE-training-<env>", 80, 80, 700, 350, parent="rg")
     add_vertex("subnet_app", "Subnet: PULSE-app-subnet", 120, 140, 320, 120, parent="vnet")
     add_vertex("subnet_pe", "Subnet: PULSE-private-endpoints-subnet", 480, 140, 320, 120, parent="vnet")
+    add_vertex("subnet_analytics", "Subnet: PULSE-analytics-pg-subnet", 120, 260, 320, 100, parent="vnet")
 
     add_vertex("plan", "App Service Plan (asp-PULSE-training-<env>)", 140, 300, 220, 60, parent="subnet_app")
     add_vertex("web", "Web App: app-PULSE-training-ui-<env>", 140, 380, 220, 60, parent="subnet_app")
@@ -219,6 +236,16 @@ def render_drawio(output_basename: str) -> None:
     add_vertex("law", "Log Analytics Workspace (law-PULSE-training-<env>)", 1240, 80, 280, 60, parent="rg")
     add_vertex("ai", "Application Insights (appi-PULSE-training-<env>)", 1240, 160, 280, 60, parent="rg")
 
+    add_vertex(
+        "analytics_pg",
+        "Analytics PostgreSQL Flexible Server (pg-PULSE-training-analytics-<env>)",
+        140,
+        620,
+        340,
+        60,
+        parent="subnet_analytics",
+    )
+
     # Edges (relationships)
     add_edge("e_plan_web", "plan", "web")
     add_edge("e_plan_func", "plan", "func")
@@ -239,6 +266,10 @@ def render_drawio(output_basename: str) -> None:
     add_edge("e_dns_blob_vnet", "dns_blob", "vnet", label="vnet link")
     add_edge("e_dns_web_vnet", "dns_web", "vnet", label="vnet link (optional)")
 
+    # Analytics PostgreSQL DNS zone linking to VNet
+    add_vertex("dns_pg", "Zone: privatelink.postgres.database.azure.com", 840, 320, 360, 60, parent="rg")
+    add_edge("e_dns_pg_vnet", "dns_pg", "vnet", label="vnet link")
+
     add_edge("e_openai_dep_core", "openai_account", "dep_core")
     add_edge("e_openai_dep_high", "openai_account", "dep_high")
     add_edge("e_openai_dep_audio", "openai_account", "dep_audio")
@@ -256,6 +287,10 @@ def render_drawio(output_basename: str) -> None:
 
     add_edge("e_web_ai", "web", "ai", label="AppInsights")
     add_edge("e_func_ai", "func", "ai", label="AppInsights")
+
+    # App Services -> Analytics PostgreSQL relationships
+    add_edge("e_web_analytics_pg", "web", "analytics_pg", label="PULSE_ANALYTICS_DB_HOST")
+    add_edge("e_func_analytics_pg", "func", "analytics_pg", label="PULSE_ANALYTICS_DB_HOST")
 
     tree = ElementTree(mxfile)
     output_path = Path(f"{output_basename}.drawio")
