@@ -274,6 +274,13 @@ repo so you can orient yourself quickly when extending or debugging.
       - `score numeric(5,2)` (0–100)
       - `raw_metrics jsonb`
       - `notes text`
+    - `analytics.session_transcripts`
+      - `user_id uuid`
+      - `session_id uuid`
+      - `created_at timestamptz`
+      - `updated_at timestamptz`
+      - `transcript_lines text[]`
+      - `transcript_json jsonb` (full transcript payload)
     - `analytics.user_skill_agg`
       - `user_id uuid`
       - `skill_tag text`
@@ -332,6 +339,16 @@ Apply path:
   - This `user_id` is the canonical learner identifier used by analytics and
     readiness; sessions without a valid `user_id` still function but will not
     participate in readiness aggregation.
+
+- Transcripts:
+  - Transcript blobs are written to `sessions/{sessionId}/transcript.json` as
+    `{ "transcript": [...] }`.
+  - A parallel `analytics.session_transcripts` table stores per-session
+    transcripts in Postgres with both a `transcript_lines` text array and a
+    `transcript_json` JSONB payload.
+  - `feedback_session` now prefers the Postgres transcript when available,
+    falling back to the legacy blob document for older sessions or when the
+    analytics database is not configured.
 
 **5.3 Aggregation & Readiness Computation**
 

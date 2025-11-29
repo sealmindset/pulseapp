@@ -10,6 +10,7 @@ from shared_code.blob import read_json
 from shared_code.http import json_ok, no_content, text_error
 from shared_code.analytics_events import record_session_scorecard_event
 from shared_code.readiness_service import compute_and_store_user_readiness_for_session
+from shared_code.analytics_db import get_connection
 
 
 CORS_HEADERS = {
@@ -36,15 +37,66 @@ def _orchestrator_enabled() -> bool:
     return value in ("true", "1", "yes")
 
 
-def _load_transcript(session_id: str) -> List[str]:
-    path = f"sessions/{session_id}/transcript.json"
-    doc = read_json(path) or {}
+def _extract_transcript_lines_from_doc(doc: Any) -> List[str]:
     tx = doc.get("transcript") if isinstance(doc, dict) else None
     if isinstance(tx, list):
         return [str(x) for x in tx]
     if isinstance(tx, str):
         return [tx]
     return []
+
+
+def _load_transcript(session_id: str) -> List[str]:
+    lines: List[str] = []
+
+    # Prefer analytics.session_transcripts in the analytics database when
+    # available, falling back to blob storage for legacy sessions or when the
+    # analytics DB is not configured.
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        transcript_lines,
+                        transcript_json
+                    FROM analytics.session_transcripts
+                    WHERE session_id = %s
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """,
+                    (session_id,),
+                )
+                row = cur.fetchone()
+    except Exception as exc:  # noqa: BLE001
+        logging.exception(
+            "feedback_session: failed to load transcript from analytics DB for session %s: %s",
+            session_id,
+            exc,
+        )
+        row = None
+
+    if row:
+        db_lines, transcript_json = row
+        if isinstance(db_lines, list) and db_lines:
+            return [str(x) for x in db_lines]
+        if transcript_json is not None:
+            try:
+                doc = json.loads(transcript_json) if isinstance(transcript_json, str) else transcript_json
+                if isinstance(doc, dict):
+                    lines = _extract_transcript_lines_from_doc(doc)
+                    if lines:
+                        return lines
+            except Exception as exc:  # noqa: BLE001
+                logging.exception(
+                    "feedback_session: failed to interpret transcript_json for session %s: %s",
+                    session_id,
+                    exc,
+                )
+
+    path = f"sessions/{session_id}/transcript.json"
+    doc = read_json(path) or {}
+    return _extract_transcript_lines_from_doc(doc)
 
 
 def _load_scorecard(session_id: str) -> Dict[str, Any]:

@@ -89,7 +89,7 @@ export default function SessionPage() {
       const res = await fetch("/api/orchestrator/session/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ sessionId, transcript }),
       });
       if (!res.ok) throw new Error("Failed to complete session");
     } finally {

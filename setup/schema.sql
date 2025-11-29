@@ -148,3 +148,40 @@ SELECT
     meta,
     created_at
 FROM analytics.user_readiness;
+
+-- ============================================================
+-- analytics.session_transcripts
+-- Per-session transcripts backed by JSONB payloads
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS analytics.session_transcripts (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    api_id bigserial UNIQUE,
+
+    user_id uuid,
+    session_id uuid NOT NULL,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+
+    transcript_lines text[],
+    transcript_json jsonb NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_transcripts_session_id
+    ON analytics.session_transcripts (session_id);
+
+CREATE INDEX IF NOT EXISTS idx_session_transcripts_user_created
+    ON analytics.session_transcripts (user_id, created_at DESC);
+
+CREATE OR REPLACE VIEW api.session_transcripts AS
+SELECT
+    api_id AS id,
+    id     AS uuid,
+    user_id,
+    session_id,
+    created_at,
+    updated_at,
+    transcript_lines,
+    transcript_json
+FROM analytics.session_transcripts;

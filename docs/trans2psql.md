@@ -200,3 +200,214 @@ Your goal:
 	•	A clean, hybrid storage strategy where:
 	•	Postgres holds system-of-record and query-heavy data.
 	•	JSON files hold static, code-adjacent config and prompt packs.
+
+==================================================
+6. CASE STUDY: SESSION TRANSCRIPTS → POSTGRES BACKFILL (PHASE G4b)
+==================================================
+
+This section defines a **precise, implementation-ready spec** for migrating
+session transcripts from Azure Blob Storage JSON into the
+`analytics.session_transcripts` table in PostgreSQL.
+
+This is **Phase G4b** and is intentionally separate from the **runtime writer**
+path already wired into `session_complete`. The goal is to backfill any
+historical (or otherwise existing) transcript blobs into Postgres **safely and
+idempotently**, without coupling the backfill to the live request path.
+
+### 6.1 Scope and goals
+
+- **In scope**
+  - Read existing transcript blobs from Azure Blob Storage with paths of the
+    form `sessions/{sessionId}/transcript.json`.
+  - For each blob, insert a corresponding row into
+    `analytics.session_transcripts` if (and only if) that `session_id` does not
+    already exist in the table.
+  - Optionally read the matching `sessions/{sessionId}/session.json` for
+    `user_id` and any other useful metadata already modeled in the
+    Postgres schema.
+  - Log per-session outcomes and a final summary (processed, skipped,
+    failed), suitable for ops visibility.
+
+- **Out of scope**
+  - Any changes to the live HTTP endpoints or Azure Functions.
+  - Any destructive operations (no deletes or updates of existing
+    Postgres data during backfill).
+  - Re-shaping of transcript content beyond simple normalization
+    (e.g., we do not attempt NLP transformations or content trimming here).
+
+### 6.2 Source → target mapping
+
+**Source (Blob Storage)**
+
+- Container and account: reuse the existing PULSE storage account and sessions
+  container already used by the orchestrator (same configuration as
+  `shared_code.blob`).
+- Primary source blob per session:
+  - Path: `sessions/{sessionId}/transcript.json`.
+  - Expected document shape (current + future-compatible):
+    - `session_id` (string) — should match `{sessionId}` in the path.
+    - `transcript` (array) — ordered list of transcript entries, typically
+      strings (one per line / utterance). If this becomes a richer
+      structure later (objects per line), the backfill must still preserve
+      the original payload in `transcript_json`.
+- Optional secondary source blob per session:
+  - Path: `sessions/{sessionId}/session.json`.
+  - Expected fields of interest:
+    - `session_id` (string).
+    - `user_id` (UUID string) — if present, used to populate
+      `analytics.session_transcripts.user_id`.
+    - `created_at`, `completed_at` or similar timestamps, if we ever decide to
+      use them for derived fields or auditing.
+
+**Target (Postgres – analytics.session_transcripts)**
+
+- Table: `analytics.session_transcripts` (already created in `schema.sql`).
+- Key columns (conceptual):
+  - `id uuid primary key default gen_random_uuid()` — internal canonical ID.
+  - `api_id bigserial unique` — numeric external/API ID.
+  - `user_id uuid` — optional, from `session.json.user_id` when available.
+  - `session_id uuid NOT NULL` — same UUID type as used elsewhere in analytics
+    schema; logically matches the session identifier used in blob paths and in
+    the orchestrator.
+  - `transcript_lines text[]` — normalized list of transcript lines as strings.
+  - `transcript_json jsonb` — full original transcript payload from blob
+    (`transcript.json`) so that no fidelity is lost.
+  - `created_at timestamptz default now()` — when the row was inserted.
+  - `updated_at timestamptz default now()` — for future updates if needed.
+
+**Mapping rules**
+
+- `session_id` (target) is taken from, in priority order:
+  1. `transcript.json.session_id` if present and non-empty.
+  2. `{sessionId}` component of the blob path.
+- `user_id` (target) is taken from `session.json.user_id` when present and
+  parseable as a UUID; otherwise left `NULL`.
+- `transcript_lines` (target) is a **normalized** representation of the
+  transcript in list-of-strings form:
+  - If `transcript.json.transcript` is a list:
+    - Coerce each element to string.
+    - Strip leading/trailing whitespace.
+    - Drop empty strings.
+  - If `transcript.json.transcript` is a string:
+    - Treat it as a single-element list after trimming.
+  - If `transcript.json.transcript` is missing or not usable:
+    - Leave `transcript_lines` as an empty array.
+- `transcript_json` (target) is the **entire** parsed document from
+  `transcript.json`, stored as-is (after JSON parsing) in JSONB form.
+
+### 6.3 Backfill execution model
+
+The backfill should be implemented as a **standalone, ops-invoked tool**, not as
+part of any request/response path.
+
+- Form factor: a Python script (e.g., `setup/backfill_transcripts.py`) or
+  equivalent, which can be run **on demand** by an operator.
+- Configuration:
+  - Reuse the same environment variables used by:
+    - `shared_code.blob` for Azure Storage account, container, and credentials.
+    - `shared_code.analytics_db` (or equivalent) for Postgres DSN:
+      `PULSE_ANALYTICS_DB_HOST`, `PULSE_ANALYTICS_DB_PORT`,
+      `PULSE_ANALYTICS_DB_NAME`, `PULSE_ANALYTICS_DB_USER`,
+      `PULSE_ANALYTICS_DB_PASSWORD`.
+  - Allow a **dry-run mode** flag (e.g., `--dry-run`) to log what would be
+    inserted without actually writing to Postgres.
+  - Allow optional filters (e.g., `--session-id-prefix`, `--session-id`) to
+    backfill a subset of sessions if desired.
+
+### 6.4 Backfill algorithm (per run)
+
+At a high level, one run of the backfill tool behaves as follows:
+
+1. **Initialize connections**
+   - Create a Postgres connection (or pool) using the analytics DB settings.
+   - Create a blob service client or use existing helpers to enumerate blobs in
+     the sessions container.
+
+2. **Enumerate candidate transcript blobs**
+   - List all blob names under the `sessions/` prefix.
+   - Filter to blobs whose name ends with `/transcript.json`.
+   - If filters are provided (e.g., `--session-id-prefix`), apply them here.
+
+3. **Process each transcript blob** (sequentially to start; later we may
+   consider modest parallelism with bounded concurrency):
+   - Derive `sessionId` from the blob path (`sessions/{sessionId}/transcript.json`).
+   - Parse the `transcript.json` document.
+   - Optionally read the matching `sessions/{sessionId}/session.json` for
+     `user_id` and cross-check of `session_id`.
+   - Apply **idempotency check** in Postgres:
+     - Run a lightweight query such as:
+       - `SELECT 1 FROM analytics.session_transcripts WHERE session_id = $1 LIMIT 1`.
+     - If a row already exists, **log and skip** this session (do not update).
+   - If no row exists and not in dry-run mode:
+     - Build the normalized `transcript_lines` array.
+     - Insert a new row into `analytics.session_transcripts` with:
+       - `user_id` (nullable), `session_id`, `transcript_lines`,
+         `transcript_json` and rely on defaults for timestamps.
+     - Commit or rely on autocommit depending on the chosen pattern.
+   - If running in dry-run mode:
+     - Log the candidate payload that would be inserted but **do not** execute
+       the INSERT.
+
+4. **Logging and metrics**
+   - For each session, log one of:
+     - `backfill_transcripts: inserted session {session_id}`.
+     - `backfill_transcripts: skipped existing session {session_id}`.
+     - `backfill_transcripts: failed session {session_id}: {error}`.
+   - At the end of the run, log an aggregate summary:
+     - Total transcript blobs discovered.
+     - Inserted count.
+     - Skipped (already present) count.
+     - Failed count.
+
+### 6.5 Safety, idempotency, and failure handling
+
+- **Idempotency**
+  - The presence of an existing row with the same `session_id` in
+    `analytics.session_transcripts` is treated as an indicator that the
+    backfill for that session has already been completed.
+  - The backfill tool does **not** attempt to reconcile or overwrite existing
+    rows; it only inserts missing ones.
+
+- **Partial failure behavior**
+  - If a single session fails to process (e.g., malformed JSON, DB error for
+    that row), the tool should **log the failure and continue** with other
+    sessions.
+  - The overall process should exit with a non-zero status code if any
+    failures occurred, so that ops can detect issues in automation.
+
+- **Performance considerations**
+  - Initial implementation can process sessions sequentially to keep the logic
+    simple and observable.
+  - If needed, a later iteration can introduce bounded concurrency (e.g., a
+    small worker pool) while ensuring we do not overload the DB or blob
+    service.
+
+### 6.6 Operational usage
+
+- **When to run**
+  - After the `analytics.session_transcripts` schema has been applied to the
+    analytics database.
+  - After the runtime writer path is deployed, so that new sessions are
+    automatically written to Postgres regardless of backfill progress.
+
+- **Typical sequence**
+  1. Apply latest `schema.sql` (including `analytics.session_transcripts`) to
+     the analytics database.
+  2. Deploy the updated orchestrator and UI (runtime writer path).
+  3. Verify that **new** sessions are writing to `analytics.session_transcripts`.
+  4. Run the backfill tool against production storage and analytics DB
+     (optionally starting with a limited subset via filters).
+  5. Monitor logs and metrics until all eligible transcript blobs are either
+     inserted or skipped.
+
+- **Post-backfill checks**
+  - Spot-check a sample of sessions to ensure that:
+    - `feedback_session` correctly prefers DB transcripts for those sessions.
+    - The blob transcript remains available for any remaining legacy tooling.
+  - Confirm row counts for `analytics.session_transcripts` line up with
+    expectations (e.g., approximate number of `transcript.json` blobs).
+
+This spec is intentionally **tooling-only**: it describes how to backfill
+existing transcript blobs into Postgres, while the **live system** already
+relies on Postgres as the preferred source of truth for transcripts via the
+runtime writer path.

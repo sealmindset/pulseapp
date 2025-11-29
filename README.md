@@ -323,6 +323,8 @@ normal migrations.
   - `analytics.session_events` — per-session / per-skill events.
   - `analytics.user_skill_agg` — rolling aggregates per user/skill/window.
   - `analytics.user_readiness` — readiness snapshots over time.
+  - `analytics.session_transcripts` — per-session transcripts with both a
+    flattened `transcript_lines` array and a `transcript_json` JSONB payload.
   - `api.*` views that expose numeric `id` (from `api_id`) for PostgREST while
     preserving UUIDs for internal joins.
 - To apply the schema to a fresh analytics database, use the analytics

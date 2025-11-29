@@ -294,3 +294,42 @@
   - This value is treated as a UUID and becomes the canonical `user_id` used by analytics/readiness for that learner during pilots.
 - Extended orchestrator tests to cover the new identity behavior:
   - `orchestrator/tests/test_session_endpoints.py` now verifies that when `session_start` receives a `userId` in the request body, it persists the corresponding `user_id` into the blob-backed session document via `write_json`, without changing the response contract expected by the UI.
+
+### Transcripts Storage Refactor (Phase G – JSON → Postgres)
+- Introduced a dedicated `analytics.session_transcripts` table and
+  `api.session_transcripts` view in `setup/schema.sql` to make per-session
+  transcripts first-class citizens in the analytics Postgres database:
+  - Columns: `user_id`, `session_id`, `created_at`, `updated_at`,
+    `transcript_lines text[]`, and `transcript_json jsonb`.
+  - Indexes on `(session_id)` and `(user_id, created_at DESC)` support
+    efficient lookup by session and timeline queries per user.
+- Updated `orchestrator/feedback_session/__init__.py` so `_load_transcript` now
+  prefers the Postgres transcript when present, using `analytics_db.get_connection`
+  to read from `analytics.session_transcripts` and falling back to the legacy
+  blob-based `sessions/{sessionId}/transcript.json` document when the analytics
+  database is unavailable or no transcript row exists.
+- Extended `orchestrator/tests/test_session_endpoints.py` with a
+  `test_load_transcript_prefers_db_when_available` case that patches
+  `feedback_session.get_connection` and verifies that `_load_transcript`
+  returns DB-provided `transcript_lines` without touching blob storage in the
+  happy path.
+
+### Transcripts Writer (Phase G4 – Runtime Path)
+- Updated the Session UI `completeSession` handler (`ui/app/session/page.tsx`) to
+  send the accumulated `transcript` array together with `sessionId` to
+  `/api/orchestrator/session/complete`, so the backend can persist the final
+  transcript.
+- Extended `orchestrator/session_complete/__init__.py` to:
+  - Accept an optional `transcript` field in the JSON body.
+  - Write a `sessions/{sessionId}/transcript.json` blob document shaped as
+    `{ "session_id": ..., "transcript": [...] }` for compatibility with
+    existing blob-based tooling.
+  - Insert a row into `analytics.session_transcripts` using
+    `analytics_db.get_connection`, storing both `transcript_lines` and a
+    `transcript_json` JSONB payload, while treating failures as best-effort and
+    not affecting the 204 response.
+- Added `test_session_complete_persists_transcript_to_blob_and_db` in
+  `orchestrator/tests/test_session_endpoints.py` to verify that when a
+  transcript is provided, `session_complete` writes both `session.json` and
+  `transcript.json` and attempts an `INSERT INTO analytics.session_transcripts`
+  with the expected parameters.

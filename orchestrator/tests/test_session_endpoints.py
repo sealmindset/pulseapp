@@ -1,6 +1,7 @@
 import json
 import os
 import unittest
+from contextlib import contextmanager
 from unittest import mock
 
 import azure.functions as func
@@ -84,6 +85,46 @@ class SessionCompleteTests(unittest.TestCase):
 
         resp = session_complete.main(req)
         self.assertEqual(resp.status_code, 503)
+
+    @mock.patch.dict(os.environ, {"TRAINING_ORCHESTRATOR_ENABLED": "true"}, clear=False)
+    @mock.patch.object(session_complete, "write_json")
+    @mock.patch.object(
+        session_complete,
+        "read_json",
+        return_value={"session_id": "abc", "user_id": "11111111-1111-1111-1111-111111111111"},
+    )
+    def test_session_complete_persists_transcript_to_blob_and_db(
+        self,
+        _read_mock: mock.Mock,
+        write_mock: mock.Mock,
+    ) -> None:
+        mock_conn = mock.MagicMock()
+        mock_cursor = mock.MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+
+        @contextmanager
+        def fake_get_connection():  # type: ignore[return-type]
+            yield mock_conn
+
+        body = {"sessionId": "abc", "transcript": ["line1", "line2"]}
+        req = make_json_request("/session/complete", body)
+
+        with mock.patch.object(session_complete, "get_connection", fake_get_connection):
+            resp = session_complete.main(req)
+
+        self.assertEqual(resp.status_code, 204)
+
+        # Expect writes for session.json and transcript.json
+        paths = [call.args[0] for call in write_mock.call_args_list]
+        self.assertIn("sessions/abc/session.json", paths)
+        self.assertIn("sessions/abc/transcript.json", paths)
+
+        # Expect an INSERT into analytics.session_transcripts
+        mock_cursor.execute.assert_called_once()
+        query, params = mock_cursor.execute.call_args.args
+        self.assertIn("INSERT INTO analytics.session_transcripts", query)
+        self.assertEqual(params["session_id"], "abc")
+        self.assertEqual(params["lines"], ["line1", "line2"])
 
 
 class AudioChunkTests(unittest.TestCase):
@@ -231,6 +272,21 @@ class FeedbackSessionTests(unittest.TestCase):
 
         resp = feedback_session.main(req)
         self.assertEqual(resp.status_code, 503)
+
+    def test_load_transcript_prefers_db_when_available(self) -> None:
+        mock_conn = mock.MagicMock()
+        mock_cursor = mock.MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = (["line-db-1", "line-db-2"], None)
+
+        @contextmanager
+        def fake_get_connection():  # type: ignore[return-type]
+            yield mock_conn
+
+        with mock.patch.object(feedback_session, "get_connection", fake_get_connection):
+            lines = feedback_session._load_transcript("abc")
+
+        self.assertEqual(lines, ["line-db-1", "line-db-2"])
 
 
 if __name__ == "__main__":
