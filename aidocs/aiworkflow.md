@@ -2,6 +2,20 @@
 
 This document describes the Agentic AI composition used by the PULSE Behavioral Certification Platform, where the definitions live, how each workflow runs end‑to‑end, and when/where those flows are triggered in the app.
 
+User speaks → MediaRecorder → audio_chunk endpoint
+                                    ↓
+                        gpt-4o-realtime-preview (STT)
+                                    ↓
+                            gpt-5-chat (LLM response)
+                                    ↓
+                    ┌───────────────┴───────────────┐
+                    ↓                               ↓
+        gpt-4o-realtime-preview (TTS)      Sora-2 (Avatar Video)
+                    ↓                               ↓
+                    └───────────────┬───────────────┘
+                                    ↓
+                            UI plays audio + video
+
 ## Components and File Locations
 - Orchestrator and agents (prompts/specs)
   - aidocs/trainer_prompts.md
