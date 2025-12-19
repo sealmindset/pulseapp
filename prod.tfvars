@@ -1,3 +1,6 @@
+# Azure subscription
+subscription_id = "f1e6d3a4-b486-4abc-8352-2f8f540540b4"
+
 # Core environment
 environment         = "prod"
 location            = "East US 2"
@@ -13,8 +16,17 @@ storage_account_name = "pulsetrainingprodsa123"
 # Behavioral mastery threshold used by the trainer/evaluator (0.85–1.0)
 behavioral_mastery_threshold = 0.9
 
+# App Service SKU - P1v3 (Premium V3) for production with VNet integration
+app_service_sku_name = "P1v3"
+
 # Web App private endpoint stays enabled for prod
 enable_webapp_private_endpoint = true
+
+# Enable after quota approval
+# NOTE: Premium V3 quota needed for East US 2 - request in progress
+# NOTE: sora-2 requires special feature access - request separately
+enable_app_service             = false
+enable_visual_asset_deployment = false
 
 # Analytics PostgreSQL (Longitudinal Store + Readiness DB)
 # Sizing here assumes an early pilot: General Purpose D2s v3 + 32 GB storage.

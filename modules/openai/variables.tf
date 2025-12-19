@@ -107,3 +107,9 @@ variable "openai_deployment_visual_asset_capacity" {
   type        = number
   description = "Capacity for Persona-Visual-Asset deployment."
 }
+
+variable "enable_visual_asset_deployment" {
+  type        = bool
+  description = "Whether to deploy the visual asset (DALL-E) model. Set to false if not available in subscription."
+  default     = true
+}

@@ -27,6 +27,31 @@ The current PULSE infrastructure and app implementation realize these capabiliti
 
 In summary, the inclusion of **Azure OpenAI real-time audio models** (conceptually aligned with `gpt-4o` audio capabilities) is reflected in the Terraform configuration and application code as a dedicated audio deployment (`PULSE-Audio-Realtime`) wired through the Function App and Next.js UI. Together, these components deliver the fully vocalized, immersive role-playing experience required for certifying **Mastery-Level Sales Talent (H4)**.
 
+### 3.1 Dynamic Avatar Video Generation (Sora-2)
+
+Beyond static persona images, the platform now supports **dynamic lip-synced avatar videos** using Azure OpenAI's Sora-2 model, creating a more immersive and realistic training experience.
+
+*   **Video vs Static Images:** The platform has migrated from DALL-E-3 (static image generation) to Sora-2 (video generation). This enables the AI customer persona to appear as a talking head video that synchronizes with the TTS audio output, rather than a static photograph.
+*   **Persona-Specific Avatars:** Each Platinum Rule persona (Director, Relater, Socializer, Thinker) has a distinct visual configuration:
+    - **Director:** Professional business executive, formal attire, assertive demeanor
+    - **Relater:** Warm friendly person, smart casual, patient and empathetic
+    - **Socializer:** Energetic expressive person, trendy casual, enthusiastic
+    - **Thinker:** Thoughtful analytical person, neat professional, methodical
+*   **Emotion-Aware Expressions:** The avatar service maps response content to appropriate facial expressions (neutral, interested, skeptical, pleased, concerned, excited, hesitant), making the AI persona's reactions contextually appropriate.
+*   **Graceful Degradation:** When Sora-2 is unavailable (pending quota approval), the system falls back to static images or placeholder displays without breaking the training flow.
+
+### 3.2 Complete Audio Processing Pipeline
+
+The orchestrator now implements a full end-to-end audio processing pipeline:
+
+1. **Speech-to-Text (STT):** User audio captured via MediaRecorder is transcribed using `gpt-4o-realtime-preview`.
+2. **Conversational AI:** The transcript is processed by `gpt-5-chat` with persona-aware prompting to generate contextually appropriate customer responses.
+3. **Text-to-Speech (TTS):** The AI response is synthesized into natural speech audio using `gpt-4o-realtime-preview`.
+4. **Avatar Video:** When Sora-2 is available, a lip-synced video clip is generated to accompany the audio response.
+5. **Conversation Persistence:** All exchanges are stored in blob storage for later evaluation by BCE/MCF/CPO agents.
+
+This pipeline enables truly interactive, voice-driven training sessions where trainees practice verbal communication skills in real-time with an AI customer that both speaks and visually responds.
+
 ### 4. PULSE Trainer Agent (Dev Preview)
 
 On top of the audio and chat capabilities, the platform includes an experimental **PULSE Trainer Agent** that provides step-focused coaching for the PULSE Selling framework in a dedicated Training Mode flow.

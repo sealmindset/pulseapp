@@ -28,10 +28,11 @@ resource "azurerm_linux_web_app" "PULSE_ui_api" {
   }
 
   site_config {
-    linux_fx_version = var.web_app_linux_fx_version
-    always_on        = true
+    always_on = true
 
-    application_stack {}
+    application_stack {
+      node_version = "18-lts"
+    }
   }
 
   app_settings = {

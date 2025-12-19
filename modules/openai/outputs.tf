@@ -29,6 +29,6 @@ output "deployment_PULSE_audio_realtime_name" {
 }
 
 output "deployment_persona_visual_asset_name" {
-  value       = azurerm_cognitive_deployment.persona_visual_asset.name
+  value       = var.enable_visual_asset_deployment ? azurerm_cognitive_deployment.persona_visual_asset[0].name : null
   description = "Deployment name for Persona-Visual-Asset."
 }

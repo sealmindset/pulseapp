@@ -148,10 +148,32 @@ This document describes the Agentic AI composition used by the PULSE Behavioral 
   - For production, disable ADMIN_EDIT_ENABLED or add AAD/RBAC and stricter CORS.
 
 ## Data Contracts (UI Expectations)
-- Start Session response: { sessionId: string, avatarUrl?: string }
-- Audio Chunk response (one of):
-  - JSON: { partialTranscript?: string, ttsUrl?: string, audioBase64?: string }
-  - raw audio/*
+- Start Session response:
+  ```json
+  {
+    "sessionId": "uuid",
+    "persona": { "type": "Director", "displayName": "The Director" },
+    "avatarUrl": "https://...",           // Static image fallback
+    "avatarVideoUrl": "https://...",      // Sora-2 intro video (when available)
+    "avatarVideoBase64": "...",           // Base64 video data (alternative)
+    "avatarEmotion": "neutral"            // Initial avatar emotion
+  }
+  ```
+- Audio Chunk response:
+  ```json
+  {
+    "sessionId": "uuid",
+    "partialTranscript": "User's speech text",
+    "aiResponse": "AI customer response",
+    "audioBase64": "...",                 // TTS audio (MP3)
+    "avatarState": "speaking",            // idle | speaking | listening | thinking
+    "avatarVideo": {                      // Sora-2 lip-synced video (when available)
+      "url": "https://...",
+      "base64": "...",
+      "emotion": "interested"
+    }
+  }
+  ```
 - Complete Session: 200/204 acknowledged (body ignored by UI)
 - Feedback: flexible JSON with keys like:
   - overallScore | score | mastery (number 0–1 or 0–100)

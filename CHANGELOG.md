@@ -333,3 +333,75 @@
   transcript is provided, `session_complete` writes both `session.json` and
   `transcript.json` and attempts an `INSERT INTO analytics.session_transcripts`
   with the expected parameters.
+
+## 2025-12-18
+
+### Terraform Azure Deployment (East US 2)
+- Successfully deployed core PULSE infrastructure to **East US 2** region with the following Azure OpenAI models:
+  - **Persona-Core-Chat** (`gpt-5-chat`) - Primary conversational AI for verbal interactions
+  - **Persona-High-Reasoning** (`o4-mini`) - Complex reasoning for BCE/MCF/CPO evaluation agents
+  - **PULSE-Audio-Realtime** (`gpt-4o-realtime-preview`) - Real-time speech-to-text and text-to-speech
+- All OpenAI deployments configured with `GlobalStandard` SKU for East US 2 compatibility
+- Temporarily disabled due to quota limitations (pending approval):
+  - **App Service** (Premium V3) - Requires quota increase request
+  - **Persona-Visual-Asset** (`sora-2`) - Requires special feature access request
+
+### Visual Asset Migration: DALL-E-3 → Sora-2
+- Changed visual asset model from `dall-e-3` (static images) to `sora-2` (video generation) for dynamic avatar support
+- Updated `variables.tf`:
+  - `openai_model_visual_asset_id` default changed to `"sora-2"`
+  - `enable_visual_asset_deployment` description updated to reflect Sora-2 usage
+- This enables lip-synced avatar videos instead of static persona images
+
+### Backend: Audio Processing Pipeline (Full Implementation)
+- Created `orchestrator/shared_code/openai_client.py` - Unified Azure OpenAI client utilities:
+  - `chat_completion()` - Generic chat completion with deployment selection
+  - `transcribe_audio()` - Speech-to-text using gpt-4o-realtime-preview
+  - `generate_speech()` - Text-to-speech audio generation
+  - `generate_conversation_response()` - AI customer persona response generation
+- Created `orchestrator/shared_code/avatar_service.py` - Sora-2 video generation service:
+  - `generate_avatar_video()` - Generate lip-synced avatar video clips
+  - `generate_intro_avatar()` - Generate session intro video
+  - `is_avatar_service_available()` - Check Sora-2 availability
+  - Persona-specific avatar configurations (Director, Relater, Socializer, Thinker)
+  - Emotion-to-expression mapping for dynamic avatar states
+- Fully implemented `orchestrator/audio_chunk/__init__.py`:
+  - Complete STT → LLM → TTS → Avatar pipeline
+  - Conversation history persistence to blob storage
+  - Emotion detection for avatar state management
+  - Graceful degradation when services unavailable
+
+### Backend: Session Start Enhancement
+- Updated `orchestrator/session_start/__init__.py`:
+  - Now generates intro avatar video via Sora-2 (when available)
+  - Returns enhanced response with `persona` object, `avatarVideoUrl`, and `avatarEmotion`
+  - Added `_get_persona_display_name()` for friendly persona labels
+
+### Frontend: Video Avatar Support
+- Updated `ui/components/SessionContext.tsx`:
+  - Added `AvatarState` type (`idle` | `speaking` | `listening` | `thinking`)
+  - Added `PersonaInfo` type with `type` and `displayName`
+  - Added `avatarVideoUrl` and `avatarState` to session state
+  - Added corresponding setters for new state fields
+- Completely redesigned `ui/app/session/page.tsx`:
+  - Video player replacing static image display
+  - Avatar state indicators (animated dots for speaking/listening/thinking)
+  - Enhanced transcript panel with role-based styling (user vs assistant)
+  - Proper audio element management for TTS playback
+  - Handles both video URL and base64 video data from Sora-2
+- Updated `ui/app/page.tsx` (Pre-Session):
+  - Handles new session start response format
+  - Sets `avatarVideoUrl` and `personaInfo` from response
+
+### Documentation Updates
+- Updated `aidocs/aiworkflow.md` data contracts:
+  - New session start response format with `persona`, `avatarVideoUrl`, `avatarVideoBase64`, `avatarEmotion`
+  - New audio chunk response format with `aiResponse`, `avatarState`, `avatarVideo` object
+
+### Pending Quota Requests
+- **Premium V3 quota for East US 2**: Required for App Service deployment
+- **Sora-2 access**: Required for avatar video generation feature
+
+### Environment Variables (New)
+- `AUDIO_PROCESSING_ENABLED` - Toggle for STT/TTS processing (default: true)
+- Existing `OPENAI_DEPLOYMENT_PERSONA_VISUAL_ASSET` now targets Sora-2 deployment

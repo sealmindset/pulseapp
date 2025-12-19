@@ -10,22 +10,22 @@ output "location" {
 
 output "web_app_name" {
   description = "Name of the PULSE UI/API Web App."
-  value       = module.app.web_app_name
+  value       = var.enable_app_service ? module.app[0].web_app_name : null
 }
 
 output "web_app_default_hostname" {
   description = "Default hostname of the PULSE UI/API Web App."
-  value       = module.app.web_app_default_hostname
+  value       = var.enable_app_service ? module.app[0].web_app_default_hostname : null
 }
 
 output "function_app_name" {
   description = "Name of the Scenario Orchestrator Function App."
-  value       = module.app.function_app_name
+  value       = var.enable_app_service ? module.app[0].function_app_name : null
 }
 
 output "function_app_default_hostname" {
   description = "Default hostname of the Scenario Orchestrator Function App."
-  value       = module.app.function_app_default_hostname
+  value       = var.enable_app_service ? module.app[0].function_app_default_hostname : null
 }
 
 output "storage_account_name" {
@@ -61,6 +61,7 @@ output "log_analytics_workspace_id" {
 output "app_insights_connection_string" {
   description = "Application Insights connection string."
   value       = azurerm_application_insights.app_insights.connection_string
+  sensitive   = true
 }
 
 output "analytics_pg_fqdn" {

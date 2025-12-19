@@ -1,7 +1,13 @@
+"""
+Session start handler for PULSE training sessions.
+
+Creates a new training session and optionally generates an intro avatar video.
+"""
+
 import logging
 import os
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import azure.functions as func
 
@@ -33,7 +39,7 @@ def _orchestrator_enabled() -> bool:
     return value in ("true", "1", "yes")
 
 
-def _extract_user_id(req: func.HttpRequest, body: Dict[str, Any]) -> str | None:
+def _extract_user_id(req: func.HttpRequest, body: Dict[str, Any]) -> Optional[str]:
     """Extract an optional user_id UUID from the request.
 
     This is intentionally soft-fail: if userId is missing or invalid, we
@@ -61,6 +67,31 @@ def _extract_user_id(req: func.HttpRequest, body: Dict[str, Any]) -> str | None:
     return candidate
 
 
+def _generate_intro_avatar(persona: str, session_id: str) -> Dict[str, Any]:
+    """Generate an introductory avatar video for the session."""
+    try:
+        from shared_code.avatar_service import generate_intro_avatar, is_avatar_service_available
+        
+        if not is_avatar_service_available():
+            logging.info("session_start: avatar service not available")
+            return {"avatarUrl": None, "avatarVideoUrl": None}
+        
+        result = generate_intro_avatar(persona_type=persona, session_id=session_id)
+        
+        return {
+            "avatarUrl": None,  # Static image fallback
+            "avatarVideoUrl": result.get("video_url"),
+            "avatarVideoBase64": result.get("video_base64"),
+            "avatarEmotion": result.get("emotion", "neutral"),
+        }
+    except ImportError:
+        logging.warning("session_start: avatar_service not available")
+        return {"avatarUrl": None, "avatarVideoUrl": None}
+    except Exception as exc:
+        logging.exception("session_start: avatar generation failed: %s", exc)
+        return {"avatarUrl": None, "avatarVideoUrl": None}
+
+
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info("session_start request: %s", req.method)
 
@@ -83,6 +114,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         return _error("Invalid JSON", 400)
 
     persona = body.get("persona") if isinstance(body, dict) else None
+    if not persona:
+        persona = "Relater"  # Default persona
+    
     user_id = _extract_user_id(req, body)
 
     session_id = str(uuid.uuid4())
@@ -103,4 +137,27 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         logging.exception("Failed to persist session start: %s", exc)
         return _error("Failed to start session", 500)
 
-    return _ok({"sessionId": session_id, "avatarUrl": None})
+    # Generate intro avatar video (async-friendly, non-blocking on failure)
+    avatar_data = _generate_intro_avatar(persona, session_id)
+
+    response_data: Dict[str, Any] = {
+        "sessionId": session_id,
+        "persona": {
+            "type": persona,
+            "displayName": _get_persona_display_name(persona),
+        },
+        **avatar_data,
+    }
+
+    return _ok(response_data)
+
+
+def _get_persona_display_name(persona: str) -> str:
+    """Get a display-friendly name for the persona."""
+    names = {
+        "Director": "The Director",
+        "Relater": "The Relater", 
+        "Socializer": "The Socializer",
+        "Thinker": "The Thinker",
+    }
+    return names.get(persona, persona)

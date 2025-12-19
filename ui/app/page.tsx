@@ -9,7 +9,14 @@ import { useSession } from "@/components/SessionContext";
 
 export default function PreSessionPage() {
   const router = useRouter();
-  const { persona, filters, setSessionId, setAvatarUrl } = useSession();
+  const { 
+    persona, 
+    filters, 
+    setSessionId, 
+    setAvatarUrl, 
+    setAvatarVideoUrl, 
+    setPersonaInfo 
+  } = useSession();
   const [ack, setAck] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,9 +52,25 @@ export default function PreSessionPage() {
       const sid = json.sessionId || json.id || null;
       if (!sid) throw new Error("No sessionId returned");
       setSessionId(sid);
+      
+      // Handle avatar URL (static image fallback)
       if (json.avatarUrl || json.avatar) {
         setAvatarUrl(json.avatarUrl || json.avatar);
       }
+      
+      // Handle avatar video URL (Sora-2 generated video)
+      if (json.avatarVideoUrl) {
+        setAvatarVideoUrl(json.avatarVideoUrl);
+      }
+      
+      // Handle persona info from response
+      if (json.persona && typeof json.persona === "object") {
+        setPersonaInfo({
+          type: json.persona.type || persona,
+          displayName: json.persona.displayName || persona,
+        });
+      }
+      
       router.push("/session");
     } catch (e: any) {
       setError(e.message || "Unable to start session");

@@ -1,3 +1,8 @@
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID for the AzureRM provider."
+}
+
 variable "environment" {
   type        = string
   description = "Deployment environment (e.g., prod, staging)."
@@ -48,7 +53,7 @@ variable "subnet_private_endpoints_prefix" {
 variable "app_service_sku_name" {
   type        = string
   description = "SKU name for the App Service Plan."
-  default     = "P1v3"
+  default     = "F1"
 }
 
 variable "storage_account_name" {
@@ -106,17 +111,17 @@ variable "openai_model_audio_realtime_version" {
   default     = "2024-12-17"
 }
 
-# Visual Asset (image) model
+# Visual Asset (video/avatar) model
 variable "openai_model_visual_asset_id" {
   type        = string
-  description = "Model ID for Persona-Visual-Asset deployment (e.g., gpt-image-1 or dall-e-3)."
-  default     = "gpt-image-1"
+  description = "Model ID for Persona-Visual-Asset deployment (sora-2 for avatar video generation)."
+  default     = "sora-2"
 }
 
 variable "openai_model_visual_asset_version" {
   type        = string
   description = "Model version for Persona-Visual-Asset deployment."
-  default     = "2024-12-17"
+  default     = ""
 }
 
 # Deployment SKUs and capacity (abstracted for future tuning)
@@ -189,6 +194,18 @@ variable "behavioral_mastery_threshold" {
 variable "enable_webapp_private_endpoint" {
   type        = bool
   description = "Enable private endpoint for Web App."
+  default     = true
+}
+
+variable "enable_visual_asset_deployment" {
+  type        = bool
+  description = "Whether to deploy the visual asset (Sora-2) model for avatar video generation. Set to false if not available in subscription."
+  default     = true
+}
+
+variable "enable_app_service" {
+  type        = bool
+  description = "Whether to deploy App Service (Web App and Function App). Set to false if subscription has no VM quota."
   default     = true
 }
 

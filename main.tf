@@ -13,6 +13,7 @@ terraform {
 
 provider "azurerm" {
   features {}
+  subscription_id = var.subscription_id
 }
 
 ########################
@@ -84,6 +85,7 @@ module "openai" {
   openai_deployment_audio_realtime_capacity = var.openai_deployment_audio_realtime_capacity
   openai_deployment_visual_asset_sku        = var.openai_deployment_visual_asset_sku
   openai_deployment_visual_asset_capacity   = var.openai_deployment_visual_asset_capacity
+  enable_visual_asset_deployment            = var.enable_visual_asset_deployment
 }
 
 ########################
@@ -137,8 +139,10 @@ resource "azurerm_storage_account" "storage" {
   account_replication_type = "LRS"
   account_kind             = "StorageV2"
 
-  public_network_access_enabled = false
-  min_tls_version               = "TLS1_2"
+  public_network_access_enabled   = true
+  shared_access_key_enabled       = true
+  default_to_oauth_authentication = false
+  min_tls_version                 = "TLS1_2"
 
   tags = merge(local.common_tags, {
     service_role = "content-and-logs"
@@ -255,6 +259,7 @@ module "analytics_postgres" {
 ########################
 
 module "app" {
+  count               = var.enable_app_service ? 1 : 0
   source              = "./modules/app"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
@@ -294,7 +299,7 @@ module "app" {
 ########################
 
 resource "azurerm_private_dns_zone" "webapp" {
-  count               = var.enable_webapp_private_endpoint ? 1 : 0
+  count               = var.enable_app_service && var.enable_webapp_private_endpoint ? 1 : 0
   name                = "privatelink.azurewebsites.net"
   resource_group_name = azurerm_resource_group.rg.name
 
@@ -302,7 +307,7 @@ resource "azurerm_private_dns_zone" "webapp" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "webapp_link" {
-  count                 = var.enable_webapp_private_endpoint ? 1 : 0
+  count                 = var.enable_app_service && var.enable_webapp_private_endpoint ? 1 : 0
   name                  = "webapp-dns-link"
   resource_group_name   = azurerm_resource_group.rg.name
   private_dns_zone_name = azurerm_private_dns_zone.webapp[0].name
@@ -310,7 +315,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "webapp_link" {
 }
 
 resource "azurerm_private_endpoint" "webapp" {
-  count               = var.enable_webapp_private_endpoint ? 1 : 0
+  count               = var.enable_app_service && var.enable_webapp_private_endpoint ? 1 : 0
   name                = "pe-webapp-${var.environment}"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
@@ -318,7 +323,7 @@ resource "azurerm_private_endpoint" "webapp" {
 
   private_service_connection {
     name                           = "psc-webapp-${var.environment}"
-    private_connection_resource_id = module.app.web_app_id
+    private_connection_resource_id = module.app[0].web_app_id
     is_manual_connection           = false
     subresource_names              = ["sites"]
   }
@@ -361,26 +366,15 @@ resource "azurerm_monitor_diagnostic_setting" "diag_storage" {
 
   log_analytics_workspace_id = azurerm_log_analytics_workspace.log_analytics.id
 
-  enabled_log {
-    category = "StorageRead"
-  }
-
-  enabled_log {
-    category = "StorageWrite"
-  }
-
-  enabled_log {
-    category = "StorageDelete"
-  }
-
   enabled_metric {
     category = "AllMetrics"
   }
 }
 
 resource "azurerm_monitor_diagnostic_setting" "diag_webapp" {
+  count              = var.enable_app_service ? 1 : 0
   name               = "diag-webapp"
-  target_resource_id = module.app.web_app_id
+  target_resource_id = module.app[0].web_app_id
 
   log_analytics_workspace_id = azurerm_log_analytics_workspace.log_analytics.id
 
@@ -398,8 +392,9 @@ resource "azurerm_monitor_diagnostic_setting" "diag_webapp" {
 }
 
 resource "azurerm_monitor_diagnostic_setting" "diag_functionapp" {
+  count              = var.enable_app_service ? 1 : 0
   name               = "diag-functionapp"
-  target_resource_id = module.app.function_app_id
+  target_resource_id = module.app[0].function_app_id
 
   log_analytics_workspace_id = azurerm_log_analytics_workspace.log_analytics.id
 

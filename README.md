@@ -7,12 +7,17 @@ This repository provisions a secure, production-ready Azure foundation for the P
 
 Highlights:
 - Azure resources provisioned via Terraform (AzureRM v4).
-- Azure OpenAI with multiple model deployments (chat, reasoning, audio realtime, visual asset) over Private Endpoints (no public access).
+- Azure OpenAI with multiple model deployments over Private Endpoints (no public access):
+  - **gpt-5-chat** (Persona-Core-Chat) — Conversational AI for verbal interactions
+  - **o4-mini** (Persona-High-Reasoning) — Complex reasoning for BCE/MCF/CPO evaluation
+  - **gpt-4o-realtime-preview** (PULSE-Audio-Realtime) — Real-time speech-to-text and text-to-speech
+  - **sora-2** (Persona-Visual-Asset) — Dynamic lip-synced avatar video generation
 - Storage Account with private containers and no public access.
 - App Service Plan, Web App (UI), and Function App (orchestrator) with VNet integration.
 - Private DNS Zones wired to Private Endpoints (openai, blob, azurewebsites when enabled).
 - Logging/monitoring via Log Analytics and Application Insights.
-- Next.js UI/UX with persona selection, session flow with XHR audio chunking, avatar rendering, and feedback display.
+- Next.js UI/UX with persona selection, session flow with XHR audio chunking, video avatar rendering, and feedback display.
+- Complete audio processing pipeline: STT → LLM → TTS → Avatar video generation.
 
 ## PULSE Selling Framework
 
@@ -187,9 +192,12 @@ npm run start
 
 UI features:
 - Persona selection and scenario filters
-- Session page with avatar rendering and real-time mic audio chunk upload over XHR
+- Session page with video avatar rendering and real-time mic audio chunk upload over XHR
+- Dynamic avatar states (idle, speaking, listening, thinking) with visual indicators
 - Immediate audio playback from orchestrator responses (supports `audio/*`, `ttsUrl`, `audioBase64`)
-- Transcript display and Complete Session action
+- Video avatar playback when Sora-2 is available (lip-synced to TTS audio)
+- Enhanced transcript display with role-based styling (user vs AI customer)
+- Complete Session action with conversation history persistence
 - Feedback page fetching score, rubric, and artifacts by `sessionId`
 
 ## PULSE Trainer (Dev Preview)
@@ -243,10 +251,25 @@ Important:
 
 ## Orchestrator Function App
 Terraform creates a Function App (Linux) with VNet integration to access private resources. Deploy the orchestrator code via your preferred CI/CD (zip deploy, GitHub Actions, etc.). The UI expects the Function App to expose routes such as:
-- `POST /session/start`
-- `POST /audio/chunk`
-- `POST /session/complete`
-- `GET  /feedback/{sessionId}`
+- `POST /session/start` — Creates session, generates intro avatar video (Sora-2)
+- `POST /audio/chunk` — Full STT → LLM → TTS → Avatar pipeline
+- `POST /session/complete` — Marks session complete, persists transcript
+- `GET  /feedback/{sessionId}` — Returns scores, rubric, and artifacts
+
+### Audio Processing Pipeline
+
+The `/audio/chunk` endpoint implements a complete real-time audio processing pipeline:
+
+1. **Speech-to-Text (STT):** Transcribes user audio using `gpt-4o-realtime-preview`
+2. **Conversational AI:** Generates persona-aware responses using `gpt-5-chat`
+3. **Text-to-Speech (TTS):** Synthesizes audio response using `gpt-4o-realtime-preview`
+4. **Avatar Video:** Generates lip-synced video using `sora-2` (when available)
+
+Key orchestrator modules:
+- `orchestrator/shared_code/openai_client.py` — Unified Azure OpenAI client
+- `orchestrator/shared_code/avatar_service.py` — Sora-2 video generation service
+- `orchestrator/audio_chunk/__init__.py` — Complete audio pipeline handler
+- `orchestrator/session_start/__init__.py` — Session initialization with avatar
 
 Admin endpoints (implemented in `/orchestrator`):
 - `GET/PUT   /admin/agents`

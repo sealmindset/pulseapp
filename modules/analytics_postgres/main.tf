@@ -1,5 +1,5 @@
 locals {
-  analytics_server_name = "pg-${var.project_name}-analytics-${var.environment}"
+  analytics_server_name = lower("pg-${var.project_name}-analytics-${var.environment}")
 }
 
 resource "azurerm_subnet" "analytics_pg" {
@@ -51,8 +51,9 @@ resource "azurerm_postgresql_flexible_server" "analytics" {
   backup_retention_days        = var.analytics_pg_backup_retention_days
   geo_redundant_backup_enabled = false
 
-  delegated_subnet_id = azurerm_subnet.analytics_pg.id
-  private_dns_zone_id = azurerm_private_dns_zone.analytics_pg.id
+  public_network_access_enabled = false
+  delegated_subnet_id           = azurerm_subnet.analytics_pg.id
+  private_dns_zone_id           = azurerm_private_dns_zone.analytics_pg.id
 
   tags = merge(var.common_tags, {
     service_role = "analytics-database"
