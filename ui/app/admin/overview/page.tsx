@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 // ============================================================================
 // TYPES
@@ -1796,8 +1797,17 @@ function StageEditModal({ stage, versions, isOpen, onClose, onSave }: StageEditM
 // MAIN COMPONENT
 // ============================================================================
 export default function AdminOverviewPage() {
-  const [activeTab, setActiveTab] = useState<TabType>("personas");
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") as TabType | null;
+  const [activeTab, setActiveTab] = useState<TabType>(tabFromUrl || "personas");
   const [personas, setPersonas] = useState<Persona[]>(DEFAULT_PERSONAS);
+  
+  // Update tab when URL changes
+  useEffect(() => {
+    if (tabFromUrl && ["personas", "agents", "prompts", "stages"].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
   const [personaVersions, setPersonaVersions] = useState<Record<string, PersonaVersion[]>>({});
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);

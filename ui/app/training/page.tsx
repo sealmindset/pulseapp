@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import * as SpeechSDK from "microsoft-cognitiveservices-speech-sdk";
 
 // ============================================================================
 // PULSE STAGES DATA - Comprehensive training content for each stage
@@ -295,198 +294,126 @@ const EXPERIENCE_LEVELS = [
 ];
 
 // ============================================================================
-// TRAINER AVATAR COMPONENT
+// TRAINER VIDEO COMPONENT
 // ============================================================================
-interface TrainerAvatarProps {
-  onComplete?: () => void;
-  autoPlay?: boolean;
+const INTRO_PLAYED_KEY = "pulse_intro_played";
+
+interface TrainerVideoProps {
+  experienceLevel: ExperienceLevel | null;
+  onSelectLevel: (level: ExperienceLevel) => void;
 }
 
-function TrainerAvatar({ onComplete, autoPlay = true }: TrainerAvatarProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function TrainerVideo({ experienceLevel, onSelectLevel }: TrainerVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const avatarSynthesizerRef = useRef<SpeechSDK.AvatarSynthesizer | null>(null);
-
-  const trainerScript = `Welcome to PULSE Sales Training! I'm your trainer, and I'm excited to help you master the art of consultative selling.
-
-PULSE is a proven methodology designed specifically for high-value products. Unlike traditional sales approaches that can feel pushy or transactional, PULSE focuses on building genuine connections and understanding your customer's real needs.
-
-The five steps are: Probe, Understand, Link, Solve, and Earn. Each step builds on the previous one, creating a natural conversation flow that customers appreciate.
-
-Whether you're new to sales or have years of experience, PULSE will help you significantly improve your conversion rates while making customers feel valued and understood.
-
-Let's begin your journey to becoming a trusted advisor, not just a salesperson. Select your experience level to get started!`;
-
-  const startAvatar = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const speechKey = process.env.NEXT_PUBLIC_AZURE_SPEECH_KEY;
-      const speechRegion = process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION || "eastus2";
-
-      if (!speechKey) {
-        throw new Error("Azure Speech credentials not configured");
-      }
-
-      const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
-      speechConfig.speechSynthesisVoiceName = "en-US-JennyNeural";
-
-      const avatarConfig = new SpeechSDK.AvatarConfig(
-        "lisa",
-        "casual-sitting",
-        new SpeechSDK.AvatarVideoFormat()
-      );
-
-      const iceResponse = await fetch(
-        `https://${speechRegion}.tts.speech.microsoft.com/cognitiveservices/avatar/relay/token/v1`,
-        {
-          method: "GET",
-          headers: { "Ocp-Apim-Subscription-Key": speechKey },
-        }
-      );
-
-      if (!iceResponse.ok) {
-        throw new Error("Failed to get ICE token");
-      }
-
-      const iceData = await iceResponse.json();
-      const iceServers = iceData.Urls.map((url: string) => ({
-        urls: url,
-        username: iceData.Username,
-        credential: iceData.Password,
-      }));
-
-      const peerConnection = new RTCPeerConnection({ iceServers });
-      peerConnectionRef.current = peerConnection;
-
-      peerConnection.addTransceiver("video", { direction: "sendrecv" });
-      peerConnection.addTransceiver("audio", { direction: "sendrecv" });
-
-      peerConnection.ontrack = (event) => {
-        if (event.track.kind === "video" && videoRef.current) {
-          videoRef.current.srcObject = event.streams[0];
-        } else if (event.track.kind === "audio" && audioRef.current) {
-          audioRef.current.srcObject = event.streams[0];
-        }
-      };
-
-      const avatarSynthesizer = new SpeechSDK.AvatarSynthesizer(speechConfig, avatarConfig);
-      avatarSynthesizerRef.current = avatarSynthesizer;
-
-      await avatarSynthesizer.startAvatarAsync(peerConnection);
-      setIsPlaying(true);
-      setIsLoading(false);
-
-      await avatarSynthesizer.speakTextAsync(trainerScript);
-      
-      if (onComplete) {
-        onComplete();
-      }
-    } catch (err: any) {
-      console.error("Avatar error:", err);
-      setError(err.message || "Failed to start trainer avatar");
-      setIsLoading(false);
-    }
-  };
-
-  const stopAvatar = () => {
-    if (avatarSynthesizerRef.current) {
-      avatarSynthesizerRef.current.close();
-      avatarSynthesizerRef.current = null;
-    }
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-    setIsPlaying(false);
-  };
+  const [hasPlayed, setHasPlayed] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false);
 
   useEffect(() => {
-    return () => {
-      stopAvatar();
-    };
+    // Check if intro has been played before
+    const played = localStorage.getItem(INTRO_PLAYED_KEY);
+    if (played === "true") {
+      setHasPlayed(true);
+      setShowOverlay(true);
+    } else {
+      // Auto-play on first visit
+      if (videoRef.current) {
+        videoRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch(() => {
+          // Autoplay blocked, show overlay
+          setShowOverlay(true);
+        });
+      }
+    }
   }, []);
+
+  const handlePlay = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play();
+      setIsPlaying(true);
+      setShowOverlay(false);
+    }
+  };
+
+  const handleVideoEnd = () => {
+    setIsPlaying(false);
+    setShowOverlay(true);
+    setHasPlayed(true);
+    localStorage.setItem(INTRO_PLAYED_KEY, "true");
+  };
+
+  const handleVideoPause = () => {
+    setIsPlaying(false);
+    setShowOverlay(true);
+  };
 
   return (
     <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-blue-100 to-purple-100 shadow-lg">
-      {/* Video Container */}
       <div className="aspect-video relative">
-        {!isPlaying && !isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-            {/* Placeholder trainer image */}
-            <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-200 to-purple-200 flex items-center justify-center mb-4 shadow-lg">
-              <svg className="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Meet Your PULSE Trainer</h3>
-            <p className="text-sm text-gray-600 mb-4 text-center max-w-md px-4">
-              Click play to hear an introduction to the PULSE sales methodology
-            </p>
-            <button
-              onClick={startAvatar}
-              className="px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Play Introduction
-            </button>
-          </div>
-        )}
-
-        {isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-            <p className="text-sm text-gray-600">Starting trainer avatar...</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50 p-4">
-            <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-200 to-purple-200 flex items-center justify-center mb-4 shadow-lg">
-              <svg className="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Your PULSE Trainer</h3>
-            <div className="bg-white/80 rounded-lg p-4 max-w-lg text-sm text-gray-700 leading-relaxed">
-              <p className="mb-3">
-                <strong>Welcome to PULSE Sales Training!</strong> I'm excited to help you master the art of consultative selling.
-              </p>
-              <p className="mb-3">
-                PULSE is a proven methodology designed specifically for high-value products. Unlike traditional sales approaches, PULSE focuses on building genuine connections and understanding your customer's real needs.
-              </p>
-              <p className="mb-3">
-                The five steps are: <strong>P</strong>robe, <strong>U</strong>nderstand, <strong>L</strong>ink, <strong>S</strong>olve, and <strong>E</strong>arn.
-              </p>
-              <p>
-                Select your experience level below to get started!
-              </p>
-            </div>
-          </div>
-        )}
-
         <video
           ref={videoRef}
-          autoPlay
+          src="/intro.mp4"
           playsInline
-          className={`w-full h-full object-cover ${isPlaying ? "block" : "hidden"}`}
+          onEnded={handleVideoEnd}
+          onPause={handleVideoPause}
+          onPlay={() => { setIsPlaying(true); setShowOverlay(false); }}
+          className="w-full h-full object-cover"
         />
-        <audio ref={audioRef} autoPlay />
+        
+        {/* Overlay with experience level selection */}
+        {showOverlay && !isPlaying && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-black/60 via-black/50 to-black/70 p-6">
+            {/* Experience Level Selection */}
+            <div className="text-center mb-6">
+              <h3 className="text-white text-xl font-semibold mb-2">
+                {experienceLevel ? "Your Experience Level" : "Select Your Experience Level"}
+              </h3>
+              <p className="text-white/70 text-sm">
+                {experienceLevel 
+                  ? "Click to change or watch the intro again"
+                  : "Choose the level that best matches your sales experience"
+                }
+              </p>
+            </div>
+            
+            {/* Level Buttons */}
+            <div className="flex flex-wrap justify-center gap-3 mb-6">
+              {EXPERIENCE_LEVELS.map((level) => (
+                <button
+                  key={level.id}
+                  onClick={() => onSelectLevel(level.id)}
+                  className={`px-5 py-3 rounded-xl transition-all flex items-center gap-2 ${
+                    experienceLevel === level.id
+                      ? "bg-white text-gray-900 shadow-lg scale-105"
+                      : "bg-white/20 text-white hover:bg-white/30 hover:scale-105"
+                  }`}
+                >
+                  <span className="text-xl">{level.icon}</span>
+                  <div className="text-left">
+                    <div className="font-medium">{level.name}</div>
+                    <div className={`text-xs ${experienceLevel === level.id ? "text-gray-500" : "text-white/60"}`}>
+                      {level.description}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
 
-        {isPlaying && (
-          <button
-            onClick={stopAvatar}
-            className="absolute bottom-4 right-4 px-4 py-2 bg-black/50 text-white rounded-lg hover:bg-black/70 transition-colors text-sm"
-          >
-            Stop
-          </button>
+            {/* Play Again Button */}
+            {hasPlayed && (
+              <button
+                onClick={handlePlay}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition-all text-sm"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Watch Intro Again
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -699,7 +626,7 @@ export default function TrainingPage() {
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Trainer Video Introduction */}
-            <TrainerAvatar />
+            <TrainerVideo experienceLevel={experienceLevel} onSelectLevel={handleSelectLevel} />
 
             {/* Experience Level Selection */}
             {!experienceLevel && (
@@ -842,10 +769,13 @@ export default function TrainingPage() {
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
                   D
                 </div>
-                <div>
+                <div className="flex-1">
                   <div className="font-semibold text-gray-900">Demo User</div>
                   <div className="text-sm text-gray-500">
-                    {experienceLevel ? EXPERIENCE_LEVELS.find(l => l.id === experienceLevel)?.name : "Select Level"}
+                    {experienceLevel 
+                      ? `${EXPERIENCE_LEVELS.find(l => l.id === experienceLevel)?.icon} ${EXPERIENCE_LEVELS.find(l => l.id === experienceLevel)?.name}`
+                      : "Select level above"
+                    }
                   </div>
                 </div>
               </div>
