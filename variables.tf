@@ -209,6 +209,12 @@ variable "enable_app_service" {
   default     = true
 }
 
+variable "enable_speech_avatar" {
+  type        = bool
+  description = "Whether to deploy Azure Speech Services for real-time avatar. Provides unlimited streaming (vs Sora-2's 12s limit)."
+  default     = true
+}
+
 variable "web_app_linux_fx_version" {
   type        = string
   description = "Linux FX version string for Web App runtime (e.g. NODE|18-lts or PYTHON|3.11)."
@@ -254,4 +260,10 @@ variable "analytics_pg_admin_password" {
   type        = string
   description = "Administrator password for the analytics PostgreSQL flexible server."
   sensitive   = true
+}
+
+variable "openai_public_network_access_enabled" {
+  type        = bool
+  description = "Whether to allow public network access to the Azure OpenAI account. Set to true for testing, false for production."
+  default     = false
 }

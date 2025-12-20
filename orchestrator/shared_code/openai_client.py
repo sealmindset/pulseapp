@@ -110,7 +110,7 @@ def transcribe_audio(
     language: str = "en",
 ) -> str:
     """
-    Transcribe audio using Azure OpenAI Whisper or realtime API.
+    Transcribe audio using Azure OpenAI Whisper.
     
     Args:
         audio_data: Raw audio bytes
@@ -121,9 +121,9 @@ def transcribe_audio(
         Transcribed text
     """
     config = _get_config()
-    _validate_config(config, "deployment_audio_realtime")
     
-    deployment = config["deployment_audio_realtime"]
+    # Use Whisper deployment for transcription (not realtime model)
+    deployment = os.getenv("OPENAI_DEPLOYMENT_WHISPER", "PULSE-Whisper")
     
     # Use the transcription endpoint
     url = f"{config['endpoint']}/openai/deployments/{deployment}/audio/transcriptions?api-version={config['api_version']}"

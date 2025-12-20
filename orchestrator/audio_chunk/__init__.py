@@ -147,14 +147,17 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         from shared_code.avatar_service import (
             generate_avatar_video,
             is_avatar_service_available,
+            transcribe_audio_speech_services,
         )
         
-        # Step 1: Transcribe audio (STT)
+        # Step 1: Transcribe audio (STT) - Use Whisper (webm format supported)
+        # Note: Azure Speech Services REST API doesn't support webm/opus well
+        transcript = None
         try:
             transcript = transcribe_audio(audio_data, audio_format="webm")
-            logging.info("audio_chunk: transcribed text: %s", transcript[:100] if transcript else "(empty)")
+            logging.info("audio_chunk: Whisper transcribed: %s", transcript[:100] if transcript else "(empty)")
         except Exception as stt_exc:
-            logging.exception("audio_chunk: STT failed: %s", stt_exc)
+            logging.exception("audio_chunk: Whisper STT failed: %s", stt_exc)
             transcript = None
         
         if not transcript or not transcript.strip():

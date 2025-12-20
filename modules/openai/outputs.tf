@@ -32,3 +32,9 @@ output "deployment_persona_visual_asset_name" {
   value       = var.enable_visual_asset_deployment ? azurerm_cognitive_deployment.persona_visual_asset[0].name : null
   description = "Deployment name for Persona-Visual-Asset."
 }
+
+output "primary_key" {
+  value       = azurerm_cognitive_account.openai.primary_access_key
+  description = "Primary API key for Azure OpenAI."
+  sensitive   = true
+}

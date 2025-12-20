@@ -36,27 +36,35 @@ resource "azurerm_linux_web_app" "PULSE_ui_api" {
   }
 
   app_settings = {
-    "WEBSITE_RUN_FROM_PACKAGE"              = "1"
+    "WEBSITE_RUN_FROM_PACKAGE"              = "0"
     "APPLICATIONINSIGHTS_CONNECTION_STRING" = var.app_insights_connection_string
 
     "OPENAI_ENDPOINT"                          = var.openai_endpoint
     "OPENAI_API_VERSION"                       = var.openai_api_version
     "OPENAI_DEPLOYMENT_PERSONA_CORE_CHAT"      = var.deployment_persona_core_chat_name
     "OPENAI_DEPLOYMENT_PERSONA_HIGH_REASONING" = var.deployment_persona_high_reasoning_name
-    "OPENAI_DEPLOYMENT_PULSE_AUDIO_REALTIME"     = var.deployment_PULSE_audio_realtime_name
+    "OPENAI_DEPLOYMENT_PULSE_AUDIO_REALTIME"   = var.deployment_PULSE_audio_realtime_name
     "OPENAI_DEPLOYMENT_PERSONA_VISUAL_ASSET"   = var.deployment_persona_visual_asset_name
 
     "STORAGE_ACCOUNT_NAME"               = var.storage_account_name
     "STORAGE_CERTIFICATION_CONTAINER"    = var.storage_certification_container
     "STORAGE_INTERACTION_LOGS_CONTAINER" = var.storage_interaction_logs_container
 
-    "BEHAVIORAL_MASTERY_THRESHOLD"       = tostring(var.behavioral_mastery_threshold)
+    "BEHAVIORAL_MASTERY_THRESHOLD" = tostring(var.behavioral_mastery_threshold)
 
     "PULSE_ANALYTICS_DB_HOST"     = var.analytics_pg_fqdn
     "PULSE_ANALYTICS_DB_PORT"     = "5432"
     "PULSE_ANALYTICS_DB_NAME"     = var.analytics_pg_database_name
     "PULSE_ANALYTICS_DB_USER"     = var.analytics_pg_admin_username
     "PULSE_ANALYTICS_DB_PASSWORD" = var.analytics_pg_admin_password
+
+    # Next.js environment variables (NEXT_PUBLIC_ are build-time, but set for reference)
+    "NEXT_PUBLIC_ENABLE_ADMIN" = "true"
+    "NEXT_PUBLIC_ENV_NAME"     = var.environment == "prod" ? "dev" : var.environment
+    "PORT"                     = "3000"
+
+    # Function App URL for API proxy routes
+    "FUNCTION_APP_BASE_URL" = "https://${local.function_app_name}.azurewebsites.net/api"
   }
 
   tags = merge(var.common_tags, { service_role = "ui-api" })
@@ -96,9 +104,10 @@ resource "azurerm_linux_function_app" "scenario_orchestrator" {
 
     "OPENAI_ENDPOINT"                          = var.openai_endpoint
     "OPENAI_API_VERSION"                       = var.openai_api_version
+    "AZURE_OPENAI_API_KEY"                     = var.openai_api_key
     "OPENAI_DEPLOYMENT_PERSONA_CORE_CHAT"      = var.deployment_persona_core_chat_name
     "OPENAI_DEPLOYMENT_PERSONA_HIGH_REASONING" = var.deployment_persona_high_reasoning_name
-    "OPENAI_DEPLOYMENT_PULSE_AUDIO_REALTIME"     = var.deployment_PULSE_audio_realtime_name
+    "OPENAI_DEPLOYMENT_PULSE_AUDIO_REALTIME"   = var.deployment_PULSE_audio_realtime_name
 
     "STORAGE_ACCOUNT_NAME"               = var.storage_account_name
     "STORAGE_CERTIFICATION_CONTAINER"    = var.storage_certification_container
@@ -112,6 +121,21 @@ resource "azurerm_linux_function_app" "scenario_orchestrator" {
     "PULSE_ANALYTICS_DB_NAME"     = var.analytics_pg_database_name
     "PULSE_ANALYTICS_DB_USER"     = var.analytics_pg_admin_username
     "PULSE_ANALYTICS_DB_PASSWORD" = var.analytics_pg_admin_password
+
+    # Azure Speech Avatar configuration
+    "AZURE_SPEECH_REGION" = var.speech_region != null ? var.speech_region : var.location
+    "AZURE_SPEECH_KEY"    = var.speech_key
+
+    # Training orchestrator - enable by default for deployed environments
+    "TRAINING_ORCHESTRATOR_ENABLED" = "true"
+    "AUDIO_PROCESSING_ENABLED"      = "true"
+
+    # Blob container for session data
+    "PROMPTS_CONTAINER" = var.storage_interaction_logs_container
+
+    # Enable Oryx build for Python dependencies
+    "SCM_DO_BUILD_DURING_DEPLOYMENT" = "true"
+    "ENABLE_ORYX_BUILD"              = "true"
   }
 
   tags = merge(var.common_tags, { service_role = "scenario-orchestrator" })

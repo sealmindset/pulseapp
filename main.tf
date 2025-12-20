@@ -45,6 +45,14 @@ resource "azurerm_subnet" "subnet_app" {
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = [var.subnet_app_prefix]
+
+  delegation {
+    name = "app-service-delegation"
+    service_delegation {
+      name    = "Microsoft.Web/serverFarms"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
+  }
 }
 
 resource "azurerm_subnet" "subnet_private_endpoints" {
@@ -86,6 +94,22 @@ module "openai" {
   openai_deployment_visual_asset_sku        = var.openai_deployment_visual_asset_sku
   openai_deployment_visual_asset_capacity   = var.openai_deployment_visual_asset_capacity
   enable_visual_asset_deployment            = var.enable_visual_asset_deployment
+  openai_public_network_access_enabled      = var.openai_public_network_access_enabled
+}
+
+########################
+# Azure Speech Services (Avatar)
+########################
+
+module "speech" {
+  source              = "./modules/speech"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  project_name        = var.project_name
+  environment         = var.environment
+  common_tags         = local.common_tags
+
+  enable_speech_avatar = var.enable_speech_avatar
 }
 
 ########################
@@ -122,6 +146,48 @@ resource "azurerm_private_endpoint" "openai" {
   private_dns_zone_group {
     name                 = "openai-dnszone-group"
     private_dns_zone_ids = [azurerm_private_dns_zone.openai.id]
+  }
+
+  tags = local.common_tags
+}
+
+########################
+# Azure Speech Services Private Endpoint & DNS
+########################
+
+resource "azurerm_private_dns_zone" "speech" {
+  count               = var.enable_speech_avatar ? 1 : 0
+  name                = "privatelink.cognitiveservices.azure.com"
+  resource_group_name = azurerm_resource_group.rg.name
+
+  tags = local.common_tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "speech_link" {
+  count                 = var.enable_speech_avatar ? 1 : 0
+  name                  = "speech-dns-link"
+  resource_group_name   = azurerm_resource_group.rg.name
+  private_dns_zone_name = azurerm_private_dns_zone.speech[0].name
+  virtual_network_id    = azurerm_virtual_network.vnet.id
+}
+
+resource "azurerm_private_endpoint" "speech" {
+  count               = var.enable_speech_avatar ? 1 : 0
+  name                = "pe-speech-${var.environment}"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  subnet_id           = azurerm_subnet.subnet_private_endpoints.id
+
+  private_service_connection {
+    name                           = "psc-speech-${var.environment}"
+    private_connection_resource_id = module.speech.speech_account_id
+    is_manual_connection           = false
+    subresource_names              = ["account"]
+  }
+
+  private_dns_zone_group {
+    name                 = "speech-dnszone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.speech[0].id]
   }
 
   tags = local.common_tags
@@ -273,6 +339,7 @@ module "app" {
 
   openai_endpoint                        = module.openai.endpoint
   openai_api_version                     = var.openai_api_version
+  openai_api_key                         = module.openai.primary_key
   deployment_persona_core_chat_name      = module.openai.deployment_persona_core_chat_name
   deployment_persona_high_reasoning_name = module.openai.deployment_persona_high_reasoning_name
   deployment_PULSE_audio_realtime_name     = module.openai.deployment_PULSE_audio_realtime_name
@@ -292,6 +359,10 @@ module "app" {
   analytics_pg_admin_password = var.analytics_pg_admin_password
 
   behavioral_mastery_threshold = var.behavioral_mastery_threshold
+
+  # Azure Speech Avatar configuration
+  speech_region = module.speech.speech_region
+  speech_key    = module.speech.speech_key
 }
 
 ########################
@@ -400,10 +471,6 @@ resource "azurerm_monitor_diagnostic_setting" "diag_functionapp" {
 
   enabled_log {
     category = "FunctionAppLogs"
-  }
-
-  enabled_log {
-    category = "AppServiceHTTPLogs"
   }
 
   enabled_metric {

@@ -41,3 +41,58 @@ BEHAVIORAL CONSTRAINTS:
 3. PULSE Execution Test: You will present a severe, genuine objection (Objection) regarding price (C2). The trainee must employ the L.E.R.A. framework (Listen, Empathize, Reaffirm, Add Relevant Information) precisely and introduce financing as the primary counter-tool to the price concern.
 4. IP Test: You will critically question the warranty and the 100-Night In-Home Trial (E22) terms. The trainee must use purposeful language (E10) to build value in the high-quality materials (Supima/OEKO-TEX) (E8, E9) to justify the premium price point (C2).
 INITIAL SCENARIO CONTEXT: You approach the professional with a serious demeanor and state, "I have a few questions before I try out a bed. I've done extensive research online regarding your warranty and the technology. Specifically, tell me more about how your beds are constructed and how the data is used.".
+
+--------------------------------------------------------------------------------
+## Azure OpenAI Deployment Capacity Planning
+
+The personas are powered by Azure OpenAI deployments. Capacity is measured in **TPM (Tokens Per Minute)** and directly impacts the user experience during live interactions.
+
+### Capacity Requirements by Use Case
+
+| Use Case | Core Chat | High Reasoning | Audio Realtime | Notes |
+|----------|-----------|----------------|----------------|-------|
+| Development/Testing | 5K | 3K | 2K | Minimal, expect rate limiting |
+| Live Demo (30 min) | 50K+ | 20K+ | 30K+ | Executive presentations, zero tolerance for delays |
+| Production (multi-user) | 100K+ | 50K+ | 50K+ | Scale based on concurrent users |
+
+### Terraform Configuration
+
+Capacity is configured in `prod.tfvars`:
+
+```hcl
+# OpenAI deployment capacity (in thousands of TPM)
+openai_deployment_core_chat_capacity      = 50   # Main persona conversations
+openai_deployment_high_reasoning_capacity = 20   # BCE/MCF/CPO evaluation
+openai_deployment_audio_realtime_capacity = 30   # Real-time voice STT/TTS
+```
+
+### Symptoms of Insufficient Capacity
+
+- **HTTP 429 errors** - "Too Many Requests" rate limiting
+- **Delayed responses** - noticeable lag in persona replies during voice interaction
+- **Dropped audio chunks** - gaps in real-time transcription
+
+### Recommendations
+
+1. **Before any live demo**: Increase capacity to 50K+ TPM across all deployments
+2. **After demo**: Scale back down to reduce costs if not in active use
+3. **Production launch**: Monitor usage metrics and scale proactively
+
+### Cost Considerations
+
+Higher TPM capacity increases Azure costs. The capacity setting is a **reservation** that determines your rate limit ceiling, not direct usage charges. Actual costs are based on tokens consumed. For critical demos, over-provision to ensure flawless performance.
+
+### Testing Capacity
+
+Run the persona integration tests to validate capacity is sufficient:
+
+```bash
+cd orchestrator
+OPENAI_ENDPOINT="https://<your-endpoint>.openai.azure.com/" \
+AZURE_OPENAI_API_KEY="<your-key>" \
+OPENAI_DEPLOYMENT_PERSONA_CORE_CHAT="Persona-Core-Chat" \
+OPENAI_DEPLOYMENT_PERSONA_HIGH_REASONING="Persona-High-Reasoning" \
+python -m pytest tests/test_personas_live.py -v
+```
+
+If tests fail with 429 errors, increase capacity in Terraform and re-apply.

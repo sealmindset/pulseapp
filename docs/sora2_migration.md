@@ -1,30 +1,42 @@
-# PULSE Platform: Sora-2 Migration & Audio Pipeline Implementation
+# PULSE Platform: Avatar & Audio Pipeline Implementation
 
-> **Date:** 2025-12-18  
-> **Status:** Implementation Complete (Pending Quota Approval)  
+> **Date:** 2025-12-19  
+> **Status:** Implementation Complete  
 > **Region:** East US 2
 
 ## Executive Summary
 
-This document outlines the migration from DALL-E-3 (static image generation) to Sora-2 (video generation) for the PULSE training platform's avatar system, along with the full implementation of the real-time audio processing pipeline using Azure OpenAI models.
+This document outlines the implementation of the PULSE training platform's avatar and audio systems:
+
+1. **Azure Speech Avatar** - Real-time lip-synced avatar via WebRTC streaming
+2. **Audio Pipeline** - Full STT/LLM/TTS pipeline using Azure OpenAI models
 
 ### Key Changes
-- **Visual Assets:** DALL-E-3 → Sora-2 (static images → lip-synced video avatars)
-- **Audio Pipeline:** Stub implementation → Full STT/LLM/TTS pipeline
-- **Models Deployed:** gpt-5-chat, o4-mini, gpt-4o-realtime-preview, sora-2 (pending)
+- **Avatar System:** Azure Speech Services Avatar (real-time WebRTC streaming)
+- **Audio Pipeline:** Full STT/LLM/TTS pipeline with gpt-4o-realtime-preview
+- **Models Deployed:** gpt-5-chat, o4-mini, gpt-4o-realtime-preview
+
+### Why Azure Speech Avatar (Not Sora-2)
+| Feature | Sora-2 | Azure Speech Avatar |
+|---------|--------|---------------------|
+| **Duration** | 12 seconds max | Unlimited (real-time) |
+| **Latency** | High (video generation) | Low (WebRTC streaming) |
+| **Lip-sync** | Post-generation | Real-time with TTS |
+| **Use case** | Pre-rendered videos | Interactive conversations |
+| **Production ready** | Limited preview | Generally available |
 
 ---
 
 ## 1. Architecture Overview
 
-### 1.1 Azure OpenAI Model Deployments
+### 1.1 Azure Service Deployments
 
-| Deployment Name | Model ID | SKU | Purpose |
-|-----------------|----------|-----|---------|
-| Persona-Core-Chat | `gpt-5-chat` | GlobalStandard | Conversational AI for verbal interactions |
-| Persona-High-Reasoning | `o4-mini` | GlobalStandard | Complex reasoning (BCE/MCF/CPO agents) |
-| PULSE-Audio-Realtime | `gpt-4o-realtime-preview` | GlobalStandard | Speech-to-text & text-to-speech |
-| Persona-Visual-Asset | `sora-2` | GlobalStandard | Avatar video generation (pending quota) |
+| Service | Resource | Purpose |
+|---------|----------|---------|
+| **Azure OpenAI** | Persona-Core-Chat (`gpt-5-chat`) | Conversational AI for verbal interactions |
+| **Azure OpenAI** | Persona-High-Reasoning (`o4-mini`) | Complex reasoning (BCE/MCF/CPO agents) |
+| **Azure OpenAI** | PULSE-Audio-Realtime (`gpt-4o-realtime-preview`) | Speech-to-text & text-to-speech |
+| **Azure Speech** | Speech Services (S0) | Real-time avatar with WebRTC streaming |
 
 ### 1.2 Audio Processing Flow
 

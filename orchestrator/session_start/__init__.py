@@ -39,6 +39,20 @@ def _orchestrator_enabled() -> bool:
     return value in ("true", "1", "yes")
 
 
+# Static persona avatar images (placeholder URLs - can be replaced with actual hosted images)
+PERSONA_AVATARS = {
+    "Director": "https://api.dicebear.com/7.x/personas/svg?seed=director&backgroundColor=b6e3f4",
+    "Relater": "https://api.dicebear.com/7.x/personas/svg?seed=relater&backgroundColor=c0aede",
+    "Socializer": "https://api.dicebear.com/7.x/personas/svg?seed=socializer&backgroundColor=ffd5dc",
+    "Thinker": "https://api.dicebear.com/7.x/personas/svg?seed=thinker&backgroundColor=d1d4f9",
+}
+
+
+def _get_persona_avatar_url(persona: str) -> str:
+    """Get the avatar image URL for a persona."""
+    return PERSONA_AVATARS.get(persona, PERSONA_AVATARS.get("Relater"))
+
+
 def _extract_user_id(req: func.HttpRequest, body: Dict[str, Any]) -> Optional[str]:
     """Extract an optional user_id UUID from the request.
 
@@ -74,22 +88,22 @@ def _generate_intro_avatar(persona: str, session_id: str) -> Dict[str, Any]:
         
         if not is_avatar_service_available():
             logging.info("session_start: avatar service not available")
-            return {"avatarUrl": None, "avatarVideoUrl": None}
+            return {"avatarUrl": _get_persona_avatar_url(persona), "avatarVideoUrl": None}
         
         result = generate_intro_avatar(persona_type=persona, session_id=session_id)
         
         return {
-            "avatarUrl": None,  # Static image fallback
+            "avatarUrl": _get_persona_avatar_url(persona),  # Static image fallback
             "avatarVideoUrl": result.get("video_url"),
             "avatarVideoBase64": result.get("video_base64"),
             "avatarEmotion": result.get("emotion", "neutral"),
         }
     except ImportError:
         logging.warning("session_start: avatar_service not available")
-        return {"avatarUrl": None, "avatarVideoUrl": None}
+        return {"avatarUrl": _get_persona_avatar_url(persona), "avatarVideoUrl": None}
     except Exception as exc:
         logging.exception("session_start: avatar generation failed: %s", exc)
-        return {"avatarUrl": None, "avatarVideoUrl": None}
+        return {"avatarUrl": _get_persona_avatar_url(persona), "avatarVideoUrl": None}
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:

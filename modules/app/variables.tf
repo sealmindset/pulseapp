@@ -48,6 +48,13 @@ variable "openai_api_version" {
   description = "Azure OpenAI API version used by apps."
 }
 
+variable "openai_api_key" {
+  type        = string
+  description = "Azure OpenAI API key."
+  sensitive   = true
+  default     = ""
+}
+
 variable "deployment_persona_core_chat_name" {
   type        = string
   description = "Deployment name for Persona-Core-Chat."
@@ -130,4 +137,17 @@ variable "analytics_pg_admin_password" {
   type        = string
   description = "Administrator password for the analytics PostgreSQL flexible server."
   sensitive   = true
+}
+
+variable "speech_region" {
+  type        = string
+  description = "Azure region for Speech Services (used for avatar)."
+  default     = null
+}
+
+variable "speech_key" {
+  type        = string
+  description = "Azure Speech Services API key for avatar."
+  sensitive   = true
+  default     = ""
 }

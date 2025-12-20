@@ -1,3 +1,41 @@
+# Changelog
+
+## 2025-12-19
+
+### Streaming Speech Recognition & Natural Conversation
+- Implemented `useSpeechRecognition` hook for real-time speech-to-text using Azure Speech SDK
+  - Continuous recognition without push-to-talk
+  - Automatic silence detection (1.5s) triggers message send
+  - Interim transcript display during speech
+  - Token refresh and reconnection handling
+- Created `/api/chat` endpoint for text-based conversation (faster than audio processing)
+  - Receives recognized text directly from STT
+  - Returns AI persona response with emotion
+  - Conversation history management with 20-message limit to prevent token overflow
+- Updated session page to use streaming STT for natural conversation flow
+
+### Azure Deployment Fixes
+- **CRITICAL**: Fixed Python Function App deployment from macOS to Linux
+  - Native binaries (cryptography, psycopg) compiled on macOS are incompatible with Linux
+  - Must use `--build-remote true` for all Function App deployments
+  - Added required app settings: `SCM_DO_BUILD_DURING_DEPLOYMENT=true`, `ENABLE_ORYX_BUILD=true`
+- Fixed `requirements.txt` to use flexible version for `psycopg-binary>=3.2.1`
+- Added conversation history limit to prevent Azure OpenAI 400 errors on long conversations
+
+### Bug Fixes
+- Fixed duplicate text accumulation in speech recognition (multiple recognizers being created)
+- Fixed 500 error on `/api/chat` endpoint (URL path double `/api` issue)
+- Fixed 405 error on speech token endpoint (changed GET to POST)
+- Added WebRTC track monitoring for avatar audio debugging
+
+### Documentation
+- Created `docs/AZURE_DEPLOYMENT.md` with comprehensive deployment guide
+  - Linux vs macOS deployment requirements
+  - Remote build configuration
+  - Environment variables reference
+  - Troubleshooting guide
+
+---
 
 ### Orchestrator (Admin Endpoints)
 - Implemented Azure Functions (Python) endpoints under `/orchestrator`:
@@ -404,4 +442,75 @@
 
 ### Environment Variables (New)
 - `AUDIO_PROCESSING_ENABLED` - Toggle for STT/TTS processing (default: true)
-- Existing `OPENAI_DEPLOYMENT_PERSONA_VISUAL_ASSET` now targets Sora-2 deployment
+- `AZURE_SPEECH_KEY` - Azure Speech Services API key for avatar
+- `AZURE_SPEECH_REGION` - Azure region for Speech Services (e.g., eastus2)
+
+## 2025-12-19
+
+### Avatar Migration: Sora-2 → Azure Speech Avatar
+- Replaced Sora-2 (12-second limit) with Azure Speech Services Avatar (unlimited real-time streaming)
+- Azure Speech Avatar advantages:
+  - **No time limit** - Real-time WebRTC streaming for interactive conversations
+  - **Lower latency** - Lip-sync happens in real-time with TTS
+  - **Production ready** - Generally available service vs limited preview
+  - **Pre-built avatars** - Lisa, Harry characters with customizable voices
+
+### Backend: Avatar Service Rewrite (`orchestrator/shared_code/avatar_service.py`)
+- Complete rewrite to use Azure Speech Avatar API instead of Sora-2
+- New functions:
+  - `get_avatar_config()` - Returns avatar character, style, voice config for persona
+  - `get_avatar_token()` - Gets authentication token for client-side SDK
+  - `get_ice_server_info()` - Gets ICE server info for WebRTC connection
+  - `_build_avatar_ssml()` - Builds SSML markup for speech synthesis
+- Persona-to-avatar character mapping:
+  - **Director** → Lisa (graceful-sitting, JennyNeural voice, customerservice style)
+  - **Relater** → Harry (casual-sitting, GuyNeural voice, friendly style)
+  - **Socializer** → Lisa (graceful-sitting, AriaNeural voice, cheerful style)
+  - **Thinker** → Harry (casual-sitting, DavisNeural voice, calm style)
+
+### Terraform: Azure Speech Services Module
+- Created new `modules/speech/` module for Azure Speech Services
+- Resources created when `enable_speech_avatar = true`:
+  - `azurerm_cognitive_account` (kind: SpeechServices, SKU: S0)
+  - Private Endpoint with `privatelink.cognitiveservices.azure.com` DNS zone
+- Added `speech_region` variable to App module for Function App configuration
+- Updated `prod.tfvars`:
+  - `enable_visual_asset_deployment = false` (Sora-2 disabled)
+  - `enable_speech_avatar = true` (Speech Avatar enabled)
+
+### Architecture Change
+- Avatar rendering now happens **client-side** using Speech SDK + WebRTC
+- Backend provides: avatar config, SSML, authentication tokens
+- Client establishes WebRTC peer connection for real-time video streaming
+- No pre-generated video files - all streaming is live
+
+### Deployment Fixes (2025-12-19)
+- **Subnet delegation**: Added `Microsoft.Web/serverFarms` delegation to app subnet for VNet integration
+- **Function App diagnostics**: Removed unsupported `AppServiceHTTPLogs` category (only `FunctionAppLogs` supported)
+- **PostgreSQL zone**: Explicitly set `zone = "2"` to match existing resource and prevent Terraform drift
+- **OpenAI subdomain**: Use `lower()` for `custom_subdomain_name` to prevent case-sensitivity replacement
+- **psycopg module**: Changed `psycopg[binary]` to `psycopg-binary` for Azure Functions compatibility
+- **Next.js standalone**: Configured `output: 'standalone'` in `next.config.mjs` for Azure App Service deployment
+
+### Terraform: Function App Settings (New)
+Added missing app settings to prevent manual configuration:
+- `TRAINING_ORCHESTRATOR_ENABLED = true` - Enable orchestrator by default
+- `PROMPTS_CONTAINER` - Set to interaction-logs container for session data
+- `SCM_DO_BUILD_DURING_DEPLOYMENT = true` - Enable Oryx build for Python dependencies
+- `ENABLE_ORYX_BUILD = true` - Required for psycopg-binary installation
+- `AZURE_SPEECH_KEY` - Speech Services API key (from speech module output)
+
+### Terraform: Web App Settings (New)
+- `NEXT_PUBLIC_ENABLE_ADMIN = true` - Enable admin panel
+- `NEXT_PUBLIC_ENV_NAME = dev` - Set environment name (dev for prod to enable admin)
+- `PORT = 3000` - Next.js server port
+- `WEBSITE_RUN_FROM_PACKAGE = 0` - Disable run-from-package for standalone Next.js
+
+### Azure Speech Avatar API Key
+To retrieve the Speech Services API key:
+```bash
+az cognitiveservices account keys list \
+  --name "speech-pulse-training-prod" \
+  --resource-group "rg-PULSE-training-prod" \
+  --query "key1" -o tsv
+```

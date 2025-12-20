@@ -1,17 +1,20 @@
 locals {
+  # Resource name keeps original casing
   openai_account_name = "cog-${var.project_name}-${var.environment}"
+  # Subdomain must be lowercase (Azure auto-lowercases it)
+  openai_subdomain    = lower("cog-${var.project_name}-${var.environment}")
 }
 
 resource "azurerm_cognitive_account" "openai" {
   name                  = local.openai_account_name
   location              = var.location
   resource_group_name   = var.resource_group_name
-  custom_subdomain_name = local.openai_account_name
+  custom_subdomain_name = local.openai_subdomain
 
   kind     = "OpenAI"
   sku_name = var.openai_sku_name
 
-  public_network_access_enabled = false
+  public_network_access_enabled = var.openai_public_network_access_enabled
 
   tags = merge(var.common_tags, {
     service_role = "ai-engine"

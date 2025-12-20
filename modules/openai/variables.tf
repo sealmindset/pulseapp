@@ -113,3 +113,9 @@ variable "enable_visual_asset_deployment" {
   description = "Whether to deploy the visual asset (DALL-E) model. Set to false if not available in subscription."
   default     = true
 }
+
+variable "openai_public_network_access_enabled" {
+  type        = bool
+  description = "Whether to allow public network access to the Azure OpenAI account. Set to true for testing, false for production."
+  default     = false
+}

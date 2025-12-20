@@ -55,6 +55,8 @@ resource "azurerm_postgresql_flexible_server" "analytics" {
   delegated_subnet_id           = azurerm_subnet.analytics_pg.id
   private_dns_zone_id           = azurerm_private_dns_zone.analytics_pg.id
 
+  zone = "2"
+
   tags = merge(var.common_tags, {
     service_role = "analytics-database"
   })
