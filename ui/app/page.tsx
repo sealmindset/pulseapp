@@ -1,120 +1,137 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import PersonaSelector from "@/components/PersonaSelector";
-import ScenarioFilters from "@/components/ScenarioFilters";
-import { useState } from "react";
-import { useSession } from "@/components/SessionContext";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/components/AuthContext";
 
-export default function PreSessionPage() {
+export default function LoginPage() {
   const router = useRouter();
-  const { 
-    persona, 
-    filters, 
-    setSessionId, 
-    setAvatarUrl, 
-    setAvatarVideoUrl, 
-    setPersonaInfo 
-  } = useSession();
-  const [ack, setAck] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { isAuthenticated, login } = useAuth();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Optional pilot user id used to tag analytics/readiness. In a real
-  // deployment this would come from auth; here we allow a debug UUID via env.
-  const readinessUserId =
-    process.env.NEXT_PUBLIC_PULSE_USER_ID || process.env.NEXT_PUBLIC_PULSE_READINESS_USER_ID || null;
+  // Redirect to pre-session if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/pre-session");
+    }
+  }, [isAuthenticated, router]);
 
-  const startSession = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
-    if (!persona) {
-      setError("Please select a persona.");
-      return;
-    }
-    if (!ack) {
-      setError("Please confirm you understand the session goal.");
-      return;
-    }
     setLoading(true);
-    try {
-      const payload: any = { persona, filters, prerequisitesAccepted: true };
-      if (readinessUserId) {
-        payload.userId = readinessUserId;
-      }
-      const res = await fetch("/api/orchestrator/session/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error(`Failed to start session (${res.status})`);
-      const json = await res.json();
-      const sid = json.sessionId || json.id || null;
-      if (!sid) throw new Error("No sessionId returned");
-      setSessionId(sid);
-      
-      // Handle avatar URL (static image fallback)
-      if (json.avatarUrl || json.avatar) {
-        setAvatarUrl(json.avatarUrl || json.avatar);
-      }
-      
-      // Handle avatar video URL (Sora-2 generated video)
-      if (json.avatarVideoUrl) {
-        setAvatarVideoUrl(json.avatarVideoUrl);
-      }
-      
-      // Handle persona info from response
-      if (json.persona && typeof json.persona === "object") {
-        setPersonaInfo({
-          type: json.persona.type || persona,
-          displayName: json.persona.displayName || persona,
-        });
-      }
-      
-      router.push("/session");
-    } catch (e: any) {
-      setError(e.message || "Unable to start session");
-    } finally {
-      setLoading(false);
+
+    // Small delay to simulate network request
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const success = login(username, password);
+    if (success) {
+      router.push("/pre-session");
+    } else {
+      setError("Invalid credentials. Try demo / demo");
     }
+    setLoading(false);
   };
 
+  // Don't render login form if already authenticated (will redirect)
+  if (isAuthenticated) {
+    return null;
+  }
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Pre-Session</h1>
-      <p className="text-sm text-gray-600">Select a persona and a scenario to begin a behavioral certification session.</p>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <PersonaSelector />
-        </div>
-        <div>
-          <ScenarioFilters />
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <div className="rounded border border-gray-200 p-4">
-          <div className="text-sm font-medium">Prerequisites</div>
-          <p className="mt-1 text-sm text-gray-600">Goal: Successfully use the LERA framework to overcome a price (C2) objection and compel a “YES” to Close Today.</p>
-          <label className="mt-2 inline-flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
-            <span>I understand and accept the goal.</span>
-          </label>
+    <div className="min-h-[80vh] flex items-center justify-center">
+      <div className="w-full max-w-md">
+        {/* Logo/Brand */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-black text-white text-2xl font-bold mb-4">
+            P
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900">PULSE Training</h1>
+          <p className="mt-2 text-gray-600">Sales Behavioral Certification Platform</p>
         </div>
 
-        {error && <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div>}
+        {/* Login Card */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
+          <h2 className="text-xl font-semibold text-center mb-6">Sign In</h2>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={startSession}
-            disabled={loading}
-            className="inline-flex items-center rounded-md bg-black px-4 py-2 text-white hover:bg-gray-800 disabled:opacity-60"
-          >
-            {loading ? "Starting..." : "Start Session"}
-          </button>
-          <Link href="/admin" className="text-sm text-gray-600 underline">Admin</Link>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all"
+                placeholder="Enter username"
+                required
+                autoComplete="username"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all"
+                placeholder="Enter password"
+                required
+                autoComplete="current-password"
+              />
+            </div>
+
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+          </form>
+
+          {/* Dev mode hint */}
+          <div className="mt-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <span className="text-yellow-600">💡</span>
+              <div className="text-sm text-yellow-800">
+                <span className="font-medium">Dev Mode:</span> Use credentials{" "}
+                <code className="px-1.5 py-0.5 bg-yellow-100 rounded font-mono text-xs">demo</code> /{" "}
+                <code className="px-1.5 py-0.5 bg-yellow-100 rounded font-mono text-xs">demo</code>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Footer */}
+        <p className="mt-6 text-center text-sm text-gray-500">
+          PULSE Selling Methodology Training Platform
+        </p>
       </div>
     </div>
   );
