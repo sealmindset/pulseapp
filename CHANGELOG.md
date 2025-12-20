@@ -1,5 +1,44 @@
 # Changelog
 
+## 2025-12-20 (Session 2)
+
+### Admin Authentication & Authorization Management
+- Created `/admin/auth` page with comprehensive AuthN/Z management:
+  - **Users Tab**: User management with add/edit/delete, role assignment, status tracking
+  - **Roles Tab**: 5 role levels (Super Admin, Admin, Manager, Trainer, Trainee) with permissions
+  - **SSO/SAML Tab**: Enterprise SSO configuration (SAML 2.0, Azure AD, Okta, Google)
+  - **Security Settings Tab**: Environment mode, MFA, session timeout, password policy
+- Added orange/red gradient "Auth & Security" scorecard button to Admin dashboard
+- Dev mode banner shows when `NEXT_PUBLIC_USE_DEV_SESSION=true`
+- Demo user protected from deletion in dev mode
+
+### AI-Powered Feedback & Scoring Agent
+- Added **"AI Feedback & Scoring Agent"** prompt to Admin > AI Components > Prompts tab
+  - Persona-specific evaluation criteria
+  - Time management analysis guidelines
+  - Missed opportunity detection rules
+  - Structured JSON output format
+- Enhanced Feedback page with 3 tabs:
+  - **Current Session**: Sale outcome, overall score, persona adaptation, rubric compliance
+  - **AI Coach Analysis**: Time management, missed opportunities, PULSE stage performance, coaching tips
+  - **Session History**: Per-user session tracking, persona win rates, recent sessions list
+- Sessions now tied to logged-in user (stored in localStorage per username)
+- Demo user has full access for development/demo purposes
+
+### Training Admin Video Upload
+- Added drag-and-drop video upload to Admin > Training Administration > Settings
+- Created `/api/upload-video` endpoint with validation (MP4, MOV, AVI, WebM, max 100MB)
+- Auto-renames uploaded file to `intro.mp4` and replaces existing
+- Creates backup before replacement
+- Single-file upload enforcement (prevents multiple simultaneous uploads)
+
+### Training Admin Module Editing
+- Made PULSE Training Module cards clickable in Admin > Training Administration
+- Opens `StageEditModal` for direct editing of PULSE stage content
+- Extracted `StageEditModal` to shared component for reuse
+
+---
+
 ## 2025-12-20
 
 ### Azure Speech Avatar Audio Fix - WORKING! 🎉
