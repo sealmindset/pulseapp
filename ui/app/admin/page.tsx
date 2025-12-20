@@ -119,6 +119,58 @@ export default function AdminPage() {
               </div>
             </div>
           </Link>
+
+          {/* Authentication & Authorization Card */}
+          <Link 
+            href="/admin/auth"
+            className="group relative bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] cursor-pointer overflow-hidden"
+          >
+            {/* Background Pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-4 right-4 w-32 h-32 border-4 border-white rounded-full"></div>
+              <div className="absolute bottom-4 left-4 w-20 h-20 border-4 border-white rounded-full"></div>
+            </div>
+            
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Auth & Security</h2>
+                  <p className="text-white/70 text-sm">Users, roles, SSO/SAML</p>
+                </div>
+              </div>
+              
+              <div className="space-y-2 mb-6">
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="w-2 h-2 rounded-full bg-green-400"></span>
+                  <span>User Management</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
+                  <span>5 Role Levels</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                  <span>SSO / SAML Integration</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                  <span>Security Policies</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 text-sm font-medium group-hover:gap-3 transition-all">
+                <span>Manage Security</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </div>
+          </Link>
         </div>
       ) : (
         <div className="text-sm text-gray-600">Set NEXT_PUBLIC_ENABLE_ADMIN=true and NEXT_PUBLIC_ENV_NAME!=prod to enable in dev.</div>
