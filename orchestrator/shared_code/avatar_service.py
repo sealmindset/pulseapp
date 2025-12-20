@@ -42,33 +42,36 @@ def _validate_speech_config(config: Dict[str, str]) -> None:
 
 
 # Azure Speech Avatar character mappings per persona type
-# See: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/text-to-speech-avatar/avatar-gestures-with-ssml
+# See: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/text-to-speech-avatar/standard-avatars
+# NOTE: For real-time API, lisa-graceful-sitting, lisa-graceful-standing, 
+# lisa-technical-sitting, and lisa-technical-standing are NOT supported.
+# Use lisa with casual-sitting for real-time streaming.
 PERSONA_AVATAR_CONFIGS = {
     "Director": {
         "character": "lisa",  # Professional female avatar
-        "style": "graceful-sitting",  # Business setting style
+        "style": "casual-sitting",  # casual-sitting works with real-time API
         "voice": "en-US-JennyNeural",  # Confident, professional voice
         "voice_style": "customerservice",  # Professional tone
         "description": "Professional business executive, confident and direct",
     },
     "Relater": {
-        "character": "harry",  # Friendly male avatar
-        "style": "casual-sitting",  # Relaxed setting
-        "voice": "en-US-GuyNeural",  # Warm, friendly voice
+        "character": "lisa",  # Use lisa (standard avatar) - harry not available
+        "style": "casual-sitting",  # casual-sitting works with real-time API
+        "voice": "en-US-SaraNeural",  # Warm, friendly female voice to match Lisa avatar
         "voice_style": "friendly",  # Warm tone
         "description": "Warm friendly person, patient and empathetic",
     },
     "Socializer": {
         "character": "lisa",  # Expressive female avatar
-        "style": "graceful-sitting",
+        "style": "casual-sitting",  # casual-sitting works with real-time API
         "voice": "en-US-AriaNeural",  # Energetic voice
         "voice_style": "cheerful",  # Enthusiastic tone
         "description": "Energetic expressive person, enthusiastic and engaging",
     },
     "Thinker": {
-        "character": "harry",  # Thoughtful male avatar
-        "style": "casual-sitting",
-        "voice": "en-US-DavisNeural",  # Calm, measured voice
+        "character": "lisa",  # Use lisa (standard avatar) - harry not available
+        "style": "casual-sitting",  # casual-sitting works with real-time API
+        "voice": "en-US-MichelleNeural",  # Calm, measured female voice to match Lisa avatar
         "voice_style": "calm",  # Thoughtful tone
         "description": "Thoughtful analytical person, careful and methodical",
     },
@@ -233,9 +236,15 @@ def get_ice_server_info(region: str, speech_key: str) -> Optional[Dict[str, Any]
     }
     
     try:
+        logging.info("avatar_service: requesting ICE servers from %s", url)
         resp = requests.get(url, headers=headers, timeout=10)
         resp.raise_for_status()
-        return resp.json()
+        ice_data = resp.json()
+        logging.info("avatar_service: ICE server response: %s", str(ice_data)[:500])
+        return ice_data
+    except requests.exceptions.HTTPError as exc:
+        logging.error("avatar_service: HTTP error getting ICE servers: %s, response: %s", exc, exc.response.text if exc.response else "N/A")
+        return None
     except Exception as exc:
         logging.error("avatar_service: failed to get ICE server info: %s", exc)
         return None

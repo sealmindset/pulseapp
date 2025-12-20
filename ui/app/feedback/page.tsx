@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession } from "@/components/SessionContext";
 import { ReadinessCard } from "@/components/ReadinessCard";
+import SentimentGauge from "@/components/SentimentGauge";
 
 export default function FeedbackPage() {
   const { sessionId } = useSession();
@@ -53,35 +54,110 @@ export default function FeedbackPage() {
       )}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded border border-gray-200 p-4">
-            <div className="text-lg font-medium">Overall Score</div>
-            <div className="mt-2 text-4xl font-bold">
-              {loading ? "Loading..." : (typeof scorePct === "number" ? `${scorePct}%` : "—")}
+          {/* Sale Outcome Banner */}
+          {feedback?.scorecard?.pulse_details?.sale_outcome && (
+            <div className={`rounded-lg p-4 ${
+              feedback.scorecard.pulse_details.sale_outcome === "won" 
+                ? "bg-green-50 border-2 border-green-500" 
+                : "bg-red-50 border-2 border-red-500"
+            }`}>
+              <div className="flex items-center gap-4">
+                <span className="text-4xl">
+                  {feedback.scorecard.pulse_details.sale_outcome === "won" ? "🎉" : "😔"}
+                </span>
+                <div>
+                  <div className={`text-xl font-bold ${
+                    feedback.scorecard.pulse_details.sale_outcome === "won" ? "text-green-700" : "text-red-700"
+                  }`}>
+                    {feedback.scorecard.pulse_details.sale_outcome === "won" ? "Sale Won!" : "Sale Lost"}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Reached PULSE stage: {feedback.scorecard.pulse_details.stage_name} • 
+                    Trust: {feedback.scorecard.pulse_details.trust_score}/10 • 
+                    Exchanges: {feedback.scorecard.pulse_details.total_exchanges}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="mt-1 text-sm text-gray-600">Minimum passing threshold: 85%</div>
+          )}
+          
+          {/* Overall Score with Gauge */}
+          <div className="rounded border border-gray-200 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-lg font-medium">Overall Score</div>
+                <div className="mt-2 text-4xl font-bold">
+                  {loading ? "Loading..." : (typeof scorePct === "number" ? `${scorePct}%` : "—")}
+                </div>
+                <div className="mt-1 text-sm text-gray-600">Minimum passing threshold: 70%</div>
+                {typeof scorePct === "number" && (
+                  <div className={`mt-2 inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                    scorePct >= 70 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                  }`}>
+                    {scorePct >= 70 ? "✓ Passed" : "✗ Needs Improvement"}
+                  </div>
+                )}
+              </div>
+              {feedback?.scorecard?.pulse_details?.trust_score !== undefined && (
+                <div className="flex flex-col items-center">
+                  <SentimentGauge 
+                    trustScore={feedback.scorecard.pulse_details.trust_score} 
+                    size="sm"
+                    showLabels={true}
+                  />
+                  <div className="mt-6 text-xs text-gray-500">Final Customer Sentiment</div>
+                </div>
+              )}
+            </div>
             {error && <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div>}
           </div>
+          
+          {/* Rubric Compliance */}
           <div className="rounded border border-gray-200 p-4">
             <div className="text-lg font-medium">Rubric Compliance</div>
-            <div className="mt-2">
-              {Array.isArray(feedback?.rubric) ? (
-                <ul className="list-disc pl-6 text-sm text-gray-700">
-                  {feedback.rubric.map((r: any, idx: number) => (
-                    <li key={idx}>
-                      {r.name || r.label || `Criterion ${idx + 1}`}
-                      {typeof r.score !== "undefined" && <span className="ml-2 text-gray-500">({r.score})</span>}
-                      {typeof r.passed !== "undefined" && (
-                        <span className={`ml-2 ${r.passed ? "text-green-600" : "text-red-600"}`}>{r.passed ? "Passed" : "Needs work"}</span>
-                      )}
-                      {r.notes && <span className="ml-2 text-gray-500">— {r.notes}</span>}
-                    </li>
-                  ))}
-                </ul>
+            <div className="mt-4 space-y-3">
+              {Array.isArray(feedback?.rubric) && feedback.rubric.length > 0 ? (
+                feedback.rubric.map((r: any, idx: number) => (
+                  <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                      r.passed ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+                    }`}>
+                      {r.passed ? "✓" : "✗"}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{r.name || r.label || `Criterion ${idx + 1}`}</span>
+                        {typeof r.score !== "undefined" && (
+                          <span className="text-sm px-2 py-0.5 bg-gray-200 rounded">{r.score}/3</span>
+                        )}
+                      </div>
+                      {r.notes && <div className="mt-1 text-sm text-gray-600">{r.notes}</div>}
+                    </div>
+                  </div>
+                ))
               ) : (
-                <div className="text-sm text-gray-600">Rubric details will appear after scoring.</div>
+                <div className="text-sm text-gray-600">Rubric details will appear after the session concludes.</div>
               )}
             </div>
           </div>
+          
+          {/* Missteps Section */}
+          {feedback?.scorecard?.pulse_details?.missteps?.length > 0 && (
+            <div className="rounded border border-red-200 bg-red-50 p-4">
+              <div className="text-lg font-medium text-red-700">Missteps Detected</div>
+              <ul className="mt-2 space-y-1">
+                {feedback.scorecard.pulse_details.missteps.map((misstep: string, idx: number) => (
+                  <li key={idx} className="flex items-center gap-2 text-sm text-red-600">
+                    <span>⚠️</span>
+                    <span className="capitalize">{misstep}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 text-sm text-gray-600">
+                Avoid these behaviors in future sessions to improve your score.
+              </div>
+            </div>
+          )}
         </div>
         <div className="space-y-4">
           <div className="rounded border border-gray-200 p-4">

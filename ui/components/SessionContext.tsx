@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+
+const SESSION_ID_KEY = "pulse_session_id";
+
+// Development mode test session ID - set via env var or defaults to a fixed ID
+// This ensures consistent session tracking during development
+const DEV_SESSION_ID = process.env.NEXT_PUBLIC_DEV_SESSION_ID || "dev-test-session-001";
 
 export type ScenarioFiltersState = {
   step?: string;
@@ -38,10 +44,43 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [persona, setPersona] = useState<string | null>(null);
   const [personaInfo, setPersonaInfo] = useState<PersonaInfo | null>(null);
   const [filters, setFilters] = useState<ScenarioFiltersState>({});
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionIdState] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarVideoUrl, setAvatarVideoUrl] = useState<string | null>(null);
   const [avatarState, setAvatarState] = useState<AvatarState>("idle");
+
+  // Check if we're in dev mode (use test session ID)
+  const isDevMode = process.env.NODE_ENV === "development" || 
+                    process.env.NEXT_PUBLIC_USE_DEV_SESSION === "true";
+
+  // Load session ID from localStorage on mount, or use dev session ID
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (isDevMode && !localStorage.getItem(SESSION_ID_KEY)) {
+        // In dev mode, auto-set the test session ID if none exists
+        console.log("[SessionContext] Dev mode: using test session ID:", DEV_SESSION_ID);
+        setSessionIdState(DEV_SESSION_ID);
+        localStorage.setItem(SESSION_ID_KEY, DEV_SESSION_ID);
+      } else {
+        const stored = localStorage.getItem(SESSION_ID_KEY);
+        if (stored) {
+          setSessionIdState(stored);
+        }
+      }
+    }
+  }, [isDevMode]);
+
+  // Wrapper to persist session ID to localStorage
+  const setSessionId = (id: string | null) => {
+    setSessionIdState(id);
+    if (typeof window !== "undefined") {
+      if (id) {
+        localStorage.setItem(SESSION_ID_KEY, id);
+      } else {
+        localStorage.removeItem(SESSION_ID_KEY);
+      }
+    }
+  };
 
   const value = useMemo(
     () => ({

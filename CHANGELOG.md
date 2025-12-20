@@ -1,5 +1,20 @@
 # Changelog
 
+## 2025-12-20
+
+### Azure Speech Avatar Audio Fix - WORKING! 🎉
+- **Root Cause**: Avatar character "harry" does not exist in Azure Speech Avatar standard avatars
+- **Fix**: Changed all persona configurations to use `lisa` with `casual-sitting` style
+- **Additional Fixes**:
+  - Added `peerConnection.addTransceiver('video/audio', { direction: 'sendrecv' })` calls to properly negotiate WebRTC media tracks
+  - Fixed ICE server `Urls` array handling (Azure returns array, must pass correctly to RTCPeerConnection)
+  - Added detailed logging for `startAvatarAsync` result to diagnose connection issues
+- **Result**: Full natural conversation flow with avatar speaking AI responses
+- **Documentation**: See Azure Speech Avatar standard avatars at https://learn.microsoft.com/en-us/azure/ai-services/speech-service/text-to-speech-avatar/standard-avatars
+- **Note**: For real-time API, these styles are NOT supported: `lisa-graceful-sitting`, `lisa-graceful-standing`, `lisa-technical-sitting`, `lisa-technical-standing`
+
+---
+
 ## 2025-12-19
 
 ### Streaming Speech Recognition & Natural Conversation

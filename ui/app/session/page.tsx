@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import PulseProgressBar from "@/components/SbnProgressBar";
+import SentimentGauge from "@/components/SentimentGauge";
 import { useSession, AvatarState } from "@/components/SessionContext";
 import { useRouter } from "next/navigation";
 import { useAvatarSpeech } from "@/hooks/useAvatarSpeech";
@@ -30,6 +31,20 @@ export default function SessionPage() {
   const [useStreamingAvatar, setUseStreamingAvatar] = useState(true);
   const [interimTranscript, setInterimTranscript] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // PULSE progress tracking
+  const [pulseStage, setPulseStage] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [pulseStageName, setPulseStageName] = useState("Probe");
+  const [pulseDetectedBehaviors, setPulseDetectedBehaviors] = useState<string[]>([]);
+  
+  // Sale outcome tracking
+  const [saleOutcome, setSaleOutcome] = useState<{
+    status: "in_progress" | "won" | "lost" | "stalled";
+    trustScore: number;
+    feedback: string;
+    misstepsThisTurn: string[];
+  }>({ status: "in_progress", trustScore: 5, feedback: "", misstepsThisTurn: [] });
+  
   const fallbackVideoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
@@ -221,6 +236,28 @@ export default function SessionPage() {
       const data = await res.json();
       console.log("[Session] Chat response received:", data.aiResponse?.substring(0, 50) + "...");
       
+      // Update PULSE progress if returned from backend
+      if (data.pulseStage && data.pulseStage >= 1 && data.pulseStage <= 5) {
+        const newStage = data.pulseStage as 1 | 2 | 3 | 4 | 5;
+        if (newStage !== pulseStage) {
+          console.log("[Session] PULSE stage advanced:", pulseStage, "→", newStage, data.pulseStageName);
+          setPulseStage(newStage);
+          setPulseStageName(data.pulseStageName || data.pulseAnalysis?.stageName || "");
+          setPulseDetectedBehaviors(data.pulseAnalysis?.detectedBehaviors || []);
+        }
+      }
+      
+      // Update sale outcome if returned from backend
+      if (data.saleOutcome) {
+        console.log("[Session] Sale outcome:", data.saleOutcome.status, "trust:", data.saleOutcome.trustScore);
+        setSaleOutcome({
+          status: data.saleOutcome.status || "in_progress",
+          trustScore: data.saleOutcome.trustScore ?? 5,
+          feedback: data.saleOutcome.feedback || "",
+          misstepsThisTurn: data.saleOutcome.misstepsThisTurn || [],
+        });
+      }
+      
       // Add AI response to transcript
       if (data.aiResponse) {
         setTranscript((t) => [...t, {
@@ -350,7 +387,85 @@ export default function SessionPage() {
         )}
       </div>
 
-      <PulseProgressBar currentStep={1} />
+      <div className="space-y-2">
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <PulseProgressBar currentStep={pulseStage} />
+          </div>
+          {/* Trust Score Meter */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+            <span className="text-xs text-gray-500 font-medium">Trust</span>
+            <div className="flex gap-0.5">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => (
+                <div
+                  key={level}
+                  className={`w-2 h-4 rounded-sm ${
+                    level <= saleOutcome.trustScore
+                      ? level <= 3
+                        ? "bg-red-500"
+                        : level <= 6
+                        ? "bg-yellow-500"
+                        : "bg-green-500"
+                      : "bg-gray-200"
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="text-xs font-bold text-gray-700">{saleOutcome.trustScore}/10</span>
+          </div>
+        </div>
+        
+        {/* PULSE behavior feedback */}
+        {pulseDetectedBehaviors.length > 0 && (
+          <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-1.5 rounded-lg">
+            <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span><strong>{pulseStageName}:</strong> {pulseDetectedBehaviors.join(", ")}</span>
+          </div>
+        )}
+        
+        {/* Misstep warning */}
+        {saleOutcome.misstepsThisTurn.length > 0 && (
+          <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 px-3 py-1.5 rounded-lg">
+            <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span><strong>Misstep:</strong> {saleOutcome.misstepsThisTurn.map(m => m.replace(/_/g, " ")).join(", ")}</span>
+          </div>
+        )}
+      </div>
+      
+      {/* Sale Outcome Modal */}
+      {(saleOutcome.status === "won" || saleOutcome.status === "lost") && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className={`bg-white rounded-xl shadow-2xl p-8 max-w-md mx-4 text-center ${
+            saleOutcome.status === "won" ? "border-4 border-green-500" : "border-4 border-red-500"
+          }`}>
+            {saleOutcome.status === "won" ? (
+              <>
+                <div className="text-6xl mb-4">🎉</div>
+                <h2 className="text-2xl font-bold text-green-700 mb-2">Sale Won!</h2>
+                <p className="text-gray-600 mb-4">{saleOutcome.feedback}</p>
+                <p className="text-sm text-gray-500 mb-6">Final Trust Score: {saleOutcome.trustScore}/10</p>
+              </>
+            ) : (
+              <>
+                <div className="text-6xl mb-4">😔</div>
+                <h2 className="text-2xl font-bold text-red-700 mb-2">Sale Lost</h2>
+                <p className="text-gray-600 mb-4">{saleOutcome.feedback}</p>
+                <p className="text-sm text-gray-500 mb-6">Final Trust Score: {saleOutcome.trustScore}/10</p>
+              </>
+            )}
+            <button
+              onClick={() => router.push("/feedback")}
+              className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              View Feedback
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
@@ -400,6 +515,17 @@ export default function SessionPage() {
                 <span className="text-sm">
                   {avatarSpeechState === "connecting" ? "Connecting avatar..." : "Avatar will appear when session starts"}
                 </span>
+              </div>
+            )}
+            
+            {/* Sentiment Gauge Overlay - shows customer body language */}
+            {sessionReady && (
+              <div className="absolute bottom-4 left-4 z-20">
+                <SentimentGauge 
+                  trustScore={saleOutcome.trustScore} 
+                  size="md"
+                  showLabels={true}
+                />
               </div>
             )}
             

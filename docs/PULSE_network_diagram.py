@@ -388,9 +388,18 @@ def build_topology_dynamic(infra: ParsedInfrastructure):
                         deployment_nodes.append(dep_node)
                         openai_account >> dep_node
                 else:
-                    # Default deployments if none found
-                    for name in ["Persona-Core-Chat", "Persona-High-Reasoning", "PULSE-Audio-Realtime", "PULSE-Whisper"]:
-                        dep_node = AzureOpenAI(f"Deployment: {name}")
+                    # Default deployments if none found (matches modules/openai/main.tf)
+                    default_deps = [
+                        ("Persona-Core-Chat", True),
+                        ("Persona-High-Reasoning", True),
+                        ("PULSE-Audio-Realtime", True),
+                        ("Persona-Visual-Asset", False),  # Conditional, often disabled
+                    ]
+                    for name, enabled in default_deps:
+                        label = f"Deployment: {name}"
+                        if not enabled:
+                            label += " (disabled)"
+                        dep_node = AzureOpenAI(label)
                         deployment_nodes.append(dep_node)
                         openai_account >> dep_node
 
@@ -408,8 +417,9 @@ def build_topology_dynamic(infra: ParsedInfrastructure):
                 storage_name = infra.storage_account or "sa-<name>"
                 storage = StorageAccounts(f"Storage Account ({storage_name})")
 
+                # Only 2 containers exist in Terraform (main.tf lines 218-228)
                 containers = infra.storage_containers if infra.storage_containers else [
-                    "certification-materials", "interaction-logs", "prompts", "trainer-change-logs"
+                    "certification-materials", "interaction-logs"
                 ]
                 for container in containers:
                     container_node = StorageAccounts(f"Container: {container}")
@@ -524,15 +534,14 @@ def build_topology_static():
 
         with Cluster("Azure OpenAI: Cognitive Account + Deployments"):
             openai_account = AzureOpenAI("Cognitive Account (cog-PULSE-training-<env>)")
+            # Deployments match modules/openai/main.tf
             dep_core = AzureOpenAI("Deployment: Persona-Core-Chat")
             dep_high = AzureOpenAI("Deployment: Persona-High-Reasoning")
             dep_audio = AzureOpenAI("Deployment: PULSE-Audio-Realtime")
-            dep_whisper = AzureOpenAI("Deployment: PULSE-Whisper")
             dep_visual = AzureOpenAI("Deployment: Persona-Visual-Asset (disabled)")
             openai_account >> dep_core
             openai_account >> dep_high
             openai_account >> dep_audio
-            openai_account >> dep_whisper
             openai_account >> dep_visual
 
         with Cluster("Azure Speech Service"):
@@ -541,14 +550,11 @@ def build_topology_static():
 
         with Cluster("Storage Account + Containers"):
             storage = StorageAccounts("Storage Account (sa-<name>)")
+            # Only 2 containers defined in main.tf (lines 218-228)
             container_cert = StorageAccounts("Container: certification-materials")
             container_logs = StorageAccounts("Container: interaction-logs")
-            container_prompts = StorageAccounts("Container: prompts")
-            container_trainer_logs = StorageAccounts("Container: trainer-change-logs")
             storage >> container_cert
             storage >> container_logs
-            storage >> container_prompts
-            storage >> container_trainer_logs
 
         with Cluster("Observability"):
             law = Logs("Log Analytics Workspace (law-PULSE-training-<env>)")
@@ -683,12 +689,12 @@ def render_drawio_dynamic(output_basename: str, infra: ParsedInfrastructure) -> 
     add_vertex("openai_account", f"Azure OpenAI Account ({openai_name})", 840, 380, 380, 220, parent="rg")
 
     dep_y = 420
+    # Default deployments match modules/openai/main.tf
     for i, dep in enumerate(infra.openai_deployments if infra.openai_deployments else [
         {"name": "Persona-Core-Chat", "capacity": 50},
         {"name": "Persona-High-Reasoning", "capacity": 20},
         {"name": "PULSE-Audio-Realtime", "capacity": 4},
-        {"name": "PULSE-Whisper", "capacity": 10},
-        {"name": "Persona-Visual-Asset", "capacity": 0},
+        {"name": "Persona-Visual-Asset", "capacity": 0},  # Conditional, often disabled
     ]):
         label = f"Deployment: {dep['name']}"
         if dep.get("capacity", 1) == 0:
@@ -706,8 +712,9 @@ def render_drawio_dynamic(output_basename: str, infra: ParsedInfrastructure) -> 
     storage_name = infra.storage_account or "sa-<name>"
     add_vertex("storage", f"Storage Account ({storage_name})", 1260, 520, 280, 180, parent="rg")
 
+    # Only 2 containers defined in main.tf (lines 218-228)
     containers = infra.storage_containers if infra.storage_containers else [
-        "certification-materials", "interaction-logs", "prompts", "trainer-change-logs"
+        "certification-materials", "interaction-logs"
     ]
     cont_y = 560
     for i, container in enumerate(containers[:4]):  # Limit to 4
@@ -771,16 +778,16 @@ def render_drawio_dynamic(output_basename: str, infra: ParsedInfrastructure) -> 
 def render_drawio_static(output_basename: str) -> None:
     """Render static draw.io XML - legacy fallback."""
     # Create a default infrastructure for static rendering
+    # Matches actual Terraform resources in modules/openai/main.tf and main.tf
     infra = ParsedInfrastructure(
         speech_enabled=True,
         openai_deployments=[
             {"name": "Persona-Core-Chat", "capacity": 50},
             {"name": "Persona-High-Reasoning", "capacity": 20},
             {"name": "PULSE-Audio-Realtime", "capacity": 4},
-            {"name": "PULSE-Whisper", "capacity": 10},
-            {"name": "Persona-Visual-Asset", "capacity": 0},
+            {"name": "Persona-Visual-Asset", "capacity": 0},  # Conditional, often disabled
         ],
-        storage_containers=["certification-materials", "interaction-logs", "prompts", "trainer-change-logs"],
+        storage_containers=["certification-materials", "interaction-logs"],
     )
     render_drawio_dynamic(output_basename, infra)
 

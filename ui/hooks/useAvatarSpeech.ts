@@ -168,17 +168,23 @@ export function useAvatarSpeech(options: UseAvatarSpeechOptions = {}): UseAvatar
       const synthesizer = new SpeechSDK.AvatarSynthesizer(speechConfig, avatarSynthConfig);
       synthesizerRef.current = synthesizer;
 
-      const peerConnection = new RTCPeerConnection({
-        iceServers: iceServers
-          ? [
-              {
-                urls: iceServers.Urls,
-                username: iceServers.Username,
-                credential: iceServers.Password,
-              },
-            ]
-          : [],
-      });
+      // Log ICE servers received from token
+      console.log("[useAvatarSpeech] ICE servers from token:", iceServers ? JSON.stringify(iceServers) : "none");
+      
+      // Azure returns Urls as an array, RTCPeerConnection expects urls (lowercase) which can be string or array
+      const iceConfig = iceServers
+        ? [
+            {
+              urls: Array.isArray(iceServers.Urls) ? iceServers.Urls : [iceServers.Urls],
+              username: iceServers.Username,
+              credential: iceServers.Password,
+            },
+          ]
+        : [];
+      
+      console.log("[useAvatarSpeech] RTCPeerConnection config:", JSON.stringify({ iceServers: iceConfig }));
+      
+      const peerConnection = new RTCPeerConnection({ iceServers: iceConfig });
       peerConnectionRef.current = peerConnection;
 
       // Collect all tracks (video and audio) into a single stream
@@ -229,18 +235,47 @@ export function useAvatarSpeech(options: UseAvatarSpeechOptions = {}): UseAvatar
       peerConnection.onconnectionstatechange = () => {
         console.log("[useAvatarSpeech] Connection state:", peerConnection.connectionState);
       };
+      
+      // CRITICAL: Add transceivers to tell WebRTC to expect video and audio tracks
+      // Without this, the PeerConnection won't negotiate for media tracks
+      peerConnection.addTransceiver('video', { direction: 'sendrecv' });
+      peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
+      console.log("[useAvatarSpeech] Added video and audio transceivers");
+      
+      // Log initial peer connection state
+      console.log("[useAvatarSpeech] PeerConnection initial state:", peerConnection.connectionState, "ICE:", peerConnection.iceConnectionState);
 
       console.log("[useAvatarSpeech] Starting avatar connection...");
-      await synthesizer.startAvatarAsync(peerConnection);
+      
+      // Add event listener for when avatar starts
+      synthesizer.avatarEventReceived = (s, e) => {
+        console.log("[useAvatarSpeech] Avatar event:", e.description, "offset:", e.offset);
+      };
+      
+      const startResult = await synthesizer.startAvatarAsync(peerConnection);
+      
+      // Log the result of startAvatarAsync
+      console.log("[useAvatarSpeech] startAvatarAsync result:", startResult);
+      console.log("[useAvatarSpeech] startAvatarAsync result.reason:", startResult.reason);
+      
+      // Check if avatar start was successful
+      if (startResult.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) {
+        console.log("[useAvatarSpeech] Avatar started successfully");
+      } else if (startResult.reason === SpeechSDK.ResultReason.Canceled) {
+        const cancelResult = startResult as unknown as SpeechSDK.SpeechSynthesisResult;
+        console.error("[useAvatarSpeech] Avatar start canceled:", cancelResult.errorDetails);
+      }
+      
+      // Log peer connection state after avatar starts
+      console.log("[useAvatarSpeech] PeerConnection after start:", peerConnection.connectionState, "ICE:", peerConnection.iceConnectionState);
+      console.log("[useAvatarSpeech] MediaStream tracks after start:", mediaStream.getTracks().length);
 
-      updateState("connected");
-      isConnectingRef.current = false;
+      console.log("[useAvatarSpeech] Avatar connected, sending initial greeting...");
       scheduleTokenRefresh();
-
-      console.log("[useAvatarSpeech] Avatar connected successfully");
       
       // Send an initial greeting to make the avatar appear
       // The avatar only streams video when speaking
+      // We wait for this to complete before marking as "connected" so the UI knows it's ready
       try {
         isSpeakingRef.current = true;
         const voice = config.voice || "en-US-JennyNeural";
@@ -255,6 +290,12 @@ export function useAvatarSpeech(options: UseAvatarSpeechOptions = {}): UseAvatar
         console.warn("[useAvatarSpeech] Initial greeting failed:", greetErr);
         isSpeakingRef.current = false;
       }
+      
+      // Only mark as connected AFTER initial greeting completes
+      // This ensures the avatar is truly ready to accept new speech requests
+      updateState("connected");
+      isConnectingRef.current = false;
+      console.log("[useAvatarSpeech] Avatar fully ready");
     } catch (err) {
       console.error("[useAvatarSpeech] Connection error:", err);
       isConnectingRef.current = false;
@@ -339,13 +380,29 @@ export function useAvatarSpeech(options: UseAvatarSpeechOptions = {}): UseAvatar
         </speak>`;
 
         console.log("[useAvatarSpeech] Speaking with voice:", voice, "style:", voiceStyle);
+        console.log("[useAvatarSpeech] SSML length:", ssml.length, "text length:", text.length);
+        
+        isSpeakingRef.current = true;
         
         const result = await synthesizerRef.current!.speakSsmlAsync(ssml);
+        
+        isSpeakingRef.current = false;
+        
+        console.log("[useAvatarSpeech] Speech result reason:", result.reason, "ResultReason enum:", {
+          SynthesizingAudioCompleted: SpeechSDK.ResultReason.SynthesizingAudioCompleted,
+          Canceled: SpeechSDK.ResultReason.Canceled
+        });
         
         if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) {
           console.log("[useAvatarSpeech] Speech completed successfully");
         } else if (result.reason === SpeechSDK.ResultReason.Canceled) {
-          console.error("[useAvatarSpeech] Speech canceled, connection may be broken");
+          // Cast to access cancellation details
+          const cancelResult = result as unknown as SpeechSDK.SpeechSynthesisResult;
+          if (cancelResult.errorDetails) {
+            console.error("[useAvatarSpeech] Speech canceled:", cancelResult.errorDetails);
+          } else {
+            console.error("[useAvatarSpeech] Speech canceled, no error details available");
+          }
         } else {
           console.warn("[useAvatarSpeech] Speech synthesis result:", result.reason);
         }
