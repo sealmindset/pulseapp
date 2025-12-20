@@ -1,9 +1,15 @@
 import logging
 import os
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Iterator, Any
 
-import psycopg
+# Make psycopg optional to avoid breaking the entire function app
+try:
+    import psycopg
+    PSYCOPG_AVAILABLE = True
+except ImportError:
+    psycopg = None  # type: ignore
+    PSYCOPG_AVAILABLE = False
 
 
 _logger = logging.getLogger(__name__)
@@ -28,13 +34,17 @@ def _build_dsn() -> str:
 
 
 @contextmanager
-def get_connection() -> Iterator[psycopg.Connection]:
+def get_connection() -> Iterator[Any]:
     """Yield a psycopg connection to the analytics database.
 
     Connections are opened on demand using env configuration and closed after
     use. Autocommit is enabled because callers typically perform single-row
     inserts or short read/write transactions.
     """
+    if not PSYCOPG_AVAILABLE:
+        raise RuntimeError(
+            "psycopg is not installed. Install with: pip install psycopg[binary]"
+        )
 
     dsn = _build_dsn()
     conn = psycopg.connect(dsn, autocommit=True)

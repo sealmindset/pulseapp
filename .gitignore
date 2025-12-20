@@ -39,7 +39,7 @@ terraform.rc
 **/.Python
 **/.venv/
 **/venv/
-**/env/
+#**/env/
 **/.pytest_cache/
 **/.mypy_cache/
 **/.coverage
@@ -48,13 +48,13 @@ terraform.rc
 **/.tox/
 **/.python_packages/
 
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.*.local
-**/.env
-**/.env.local
-**/.env.*.local
-!**/.env.example
+#.env
+#.env.local
+#.env.development.local
+#.env.test.local
+##.env.production.local
+#.env.*.local
+#**/.env
+#**/.env.local
+#**/.env.*.local
+#!**/.env.example

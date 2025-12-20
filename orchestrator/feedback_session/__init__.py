@@ -1,16 +1,29 @@
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import azure.functions as func
 import requests
 
 from shared_code.blob import read_json
 from shared_code.http import json_ok, no_content, text_error
-from shared_code.analytics_events import record_session_scorecard_event
-from shared_code.readiness_service import compute_and_store_user_readiness_for_session
-from shared_code.analytics_db import get_connection
+
+# Optional imports - may not be available in all environments
+try:
+    from shared_code.analytics_events import record_session_scorecard_event
+except ImportError:
+    record_session_scorecard_event = None  # type: ignore
+
+try:
+    from shared_code.readiness_service import compute_and_store_user_readiness_for_session
+except ImportError:
+    compute_and_store_user_readiness_for_session = None  # type: ignore
+
+try:
+    from shared_code.analytics_db import get_connection
+except ImportError:
+    get_connection = None  # type: ignore
 
 
 CORS_HEADERS = {
@@ -48,33 +61,44 @@ def _extract_transcript_lines_from_doc(doc: Any) -> List[str]:
 
 def _load_transcript(session_id: str) -> List[str]:
     lines: List[str] = []
+    row = None
 
-    # Prefer analytics.session_transcripts in the analytics database when
-    # available, falling back to blob storage for legacy sessions or when the
-    # analytics DB is not configured.
+    # Try blob storage first (simpler, more reliable for dev)
     try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT
-                        transcript_lines,
-                        transcript_json
-                    FROM analytics.session_transcripts
-                    WHERE session_id = %s
-                    ORDER BY updated_at DESC
-                    LIMIT 1
-                    """,
-                    (session_id,),
-                )
-                row = cur.fetchone()
+        path = f"sessions/{session_id}/transcript.json"
+        doc = read_json(path)
+        if doc:
+            lines = _extract_transcript_lines_from_doc(doc)
+            if lines:
+                logging.info("feedback_session: loaded transcript from blob for session %s", session_id)
+                return lines
     except Exception as exc:  # noqa: BLE001
-        logging.exception(
-            "feedback_session: failed to load transcript from analytics DB for session %s: %s",
-            session_id,
-            exc,
-        )
-        row = None
+        logging.warning("feedback_session: failed to load transcript from blob for session %s: %s", session_id, exc)
+
+    # Fall back to analytics database if blob didn't have it and DB is available
+    if get_connection is not None:
+        try:
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT
+                            transcript_lines,
+                            transcript_json
+                        FROM analytics.session_transcripts
+                        WHERE session_id = %s
+                        ORDER BY updated_at DESC
+                        LIMIT 1
+                        """,
+                        (session_id,),
+                    )
+                    row = cur.fetchone()
+        except Exception as exc:  # noqa: BLE001
+            logging.warning(
+                "feedback_session: failed to load transcript from analytics DB for session %s: %s",
+                session_id,
+                exc,
+            )
 
     if row:
         db_lines, transcript_json = row
@@ -229,12 +253,16 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     if not session_id:
         return _error("Missing sessionId", 400)
 
-    session_doc = read_json(f"sessions/{session_id}/session.json")
-    if not session_doc:
-        return _error("Session not found", 404)
+    try:
+        session_doc = read_json(f"sessions/{session_id}/session.json")
+        if not session_doc:
+            return _error("Session not found", 404)
 
-    transcript_lines = _load_transcript(session_id)
-    scorecard = _load_scorecard(session_id)
+        transcript_lines = _load_transcript(session_id)
+        scorecard = _load_scorecard(session_id)
+    except Exception as exc:
+        logging.exception("feedback_session: error loading session data for %s: %s", session_id, exc)
+        return _error(f"Error loading session data: {str(exc)}", 500)
 
     body: Dict[str, Any] = {
         "artifacts": {"transcript": transcript_lines},
@@ -285,11 +313,13 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             # Record a longitudinal analytics event capturing the overall scorecard.
             # This call is gated by PULSE_ANALYTICS_ENABLED inside analytics_events and
             # will no-op when analytics are disabled or misconfigured.
-            record_session_scorecard_event(session_id, session_doc, scorecard)
+            if record_session_scorecard_event is not None:
+                record_session_scorecard_event(session_id, session_doc, scorecard)
 
             # Compute and store a readiness snapshot for the associated user when
             # readiness is enabled and a valid user_id is available on the session.
-            compute_and_store_user_readiness_for_session(session_doc)
+            if compute_and_store_user_readiness_for_session is not None:
+                compute_and_store_user_readiness_for_session(session_doc)
     except Exception as exc:  # noqa: BLE001
         logging.exception("feedback_session: failed to interpret scorecard for session %s: %s", session_id, exc)
 

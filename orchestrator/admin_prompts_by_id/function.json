@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["get", "put", "delete", "options"],
-      "route": "admin/prompts/{id}"
+      "route": "admin/prompt/{id}"
     },
     {
       "type": "http",
