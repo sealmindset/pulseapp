@@ -4,6 +4,9 @@ Thumbs.db
 .idea/
 .dccache
 docs/OIDC.md
+prod.tfvars
+*.tfvars
+!*.tfvars.example
 
 **/node_modules/
 **/logs
