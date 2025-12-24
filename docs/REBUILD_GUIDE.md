@@ -113,22 +113,85 @@ ADMIN_EDIT_ENABLED=true
 
 ## Terraform Resources
 
-All infrastructure is defined in Terraform:
+All infrastructure is defined in Terraform. The following resources will be created:
 
-- **Resource Group**: `rg-PULSE-training-prod`
-- **App Service Plan**: Linux, B1 tier
-- **Web App**: `app-PULSE-training-ui-prod` (Next.js)
-- **Function App**: `func-pulse-training-scenario-prod` (Python)
-- **Storage Account**: Blob storage for prompts/data
-- **Azure OpenAI**: Private endpoint, multiple model deployments
-- **VNet**: Network isolation with private endpoints
-- **Private DNS Zones**: For private connectivity
+### Core Infrastructure
+| Resource | Name | Description |
+|----------|------|-------------|
+| Resource Group | `rg-PULSE-training-prod` | Contains all resources |
+| Virtual Network | `vnet-PULSE-training-prod` | 10.10.0.0/16 |
+| App Subnet | `PULSE-app-subnet` | 10.10.1.0/24, hosts App Service |
+| Private Endpoints Subnet | `PULSE-private-endpoints-subnet` | 10.10.2.0/24 |
+| Analytics Subnet | `PULSE-analytics-pg-subnet` | 10.10.3.0/24, hosts PostgreSQL |
+
+### Compute
+| Resource | Name | Description |
+|----------|------|-------------|
+| App Service Plan | `asp-PULSE-training-prod` | Linux, P1v3 (Premium) |
+| Web App | `app-PULSE-training-ui-prod` | Next.js frontend |
+| Function App | `func-PULSE-training-scenario-prod` | Python orchestrator |
+
+### AI Services
+| Resource | Name | Description |
+|----------|------|-------------|
+| Azure OpenAI Account | `cog-PULSE-training-prod` | Cognitive Services |
+| Deployment: Persona-Core-Chat | gpt-5-chat | Main persona conversations (50K TPM) |
+| Deployment: Persona-High-Reasoning | o4-mini | Evaluation/scoring (20K TPM) |
+| Deployment: PULSE-Audio-Realtime | gpt-4o-realtime-preview | Real-time voice (4K TPM) |
+| Deployment: PULSE-Whisper | whisper | Speech-to-text (1 capacity) |
+| Deployment: Persona-Visual-Asset | sora-2 | **Disabled** (using Speech Avatar instead) |
+| Azure Speech Account | `speech-pulse-training-prod` | Avatar service |
+
+### Storage
+| Resource | Name | Description |
+|----------|------|-------------|
+| Storage Account | `pulsetrainingprodsa123` | Blob storage |
+| Container: certification-materials | | Training content |
+| Container: interaction-logs | | Session logs |
+| Container: prompts | | System prompts |
+
+### Database
+| Resource | Name | Description |
+|----------|------|-------------|
+| PostgreSQL Flexible Server | `pg-pulse-training-analytics-prod` | Analytics & readiness data |
+| Database | `pulse_analytics` | Main database |
+
+### Observability
+| Resource | Name | Description |
+|----------|------|-------------|
+| Log Analytics Workspace | `law-PULSE-training-prod` | Centralized logging |
+| Application Insights | `appi-PULSE-training-prod` | APM & telemetry |
+
+### Private Networking
+| Resource | Purpose |
+|----------|---------|
+| Private Endpoint: OpenAI | Secure access to Azure OpenAI |
+| Private Endpoint: Storage Blob | Secure access to storage |
+| Private Endpoint: Speech | Secure access to Speech Services |
+| Private Endpoint: Web App | Optional, for private access |
+| DNS Zone: privatelink.openai.azure.com | OpenAI name resolution |
+| DNS Zone: privatelink.blob.core.windows.net | Blob name resolution |
+| DNS Zone: privatelink.cognitiveservices.azure.com | Speech name resolution |
+| DNS Zone: privatelink.azurewebsites.net | Web App name resolution |
+| DNS Zone: privatelink.postgres.database.azure.com | PostgreSQL name resolution |
 
 ### Deploy Infrastructure
 ```bash
 terraform init
 terraform plan -var-file=prod.tfvars
 terraform apply -var-file=prod.tfvars
+```
+
+### Import Existing Resources (if recreating state)
+If you need to import existing Azure resources into a fresh Terraform state:
+```bash
+# Import PULSE-Whisper deployment (if it exists but wasn't in Terraform)
+terraform import 'module.openai.azurerm_cognitive_deployment.PULSE_whisper' \
+  '/subscriptions/<sub-id>/resourceGroups/rg-PULSE-training-prod/providers/Microsoft.CognitiveServices/accounts/cog-PULSE-training-prod/deployments/PULSE-Whisper'
+
+# Import prompts container (if it exists but wasn't in Terraform)
+terraform import 'azurerm_storage_container.prompts' \
+  'https://pulsetrainingprodsa123.blob.core.windows.net/prompts'
 ```
 
 ---

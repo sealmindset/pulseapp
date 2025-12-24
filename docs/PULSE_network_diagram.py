@@ -393,6 +393,7 @@ def build_topology_dynamic(infra: ParsedInfrastructure):
                         ("Persona-Core-Chat", True),
                         ("Persona-High-Reasoning", True),
                         ("PULSE-Audio-Realtime", True),
+                        ("PULSE-Whisper", True),  # Speech-to-text
                         ("Persona-Visual-Asset", False),  # Conditional, often disabled
                     ]
                     for name, enabled in default_deps:
@@ -417,9 +418,9 @@ def build_topology_dynamic(infra: ParsedInfrastructure):
                 storage_name = infra.storage_account or "sa-<name>"
                 storage = StorageAccounts(f"Storage Account ({storage_name})")
 
-                # Only 2 containers exist in Terraform (main.tf lines 218-228)
+                # 3 containers defined in Terraform (main.tf)
                 containers = infra.storage_containers if infra.storage_containers else [
-                    "certification-materials", "interaction-logs"
+                    "certification-materials", "interaction-logs", "prompts"
                 ]
                 for container in containers:
                     container_node = StorageAccounts(f"Container: {container}")
@@ -538,10 +539,12 @@ def build_topology_static():
             dep_core = AzureOpenAI("Deployment: Persona-Core-Chat")
             dep_high = AzureOpenAI("Deployment: Persona-High-Reasoning")
             dep_audio = AzureOpenAI("Deployment: PULSE-Audio-Realtime")
+            dep_whisper = AzureOpenAI("Deployment: PULSE-Whisper")
             dep_visual = AzureOpenAI("Deployment: Persona-Visual-Asset (disabled)")
             openai_account >> dep_core
             openai_account >> dep_high
             openai_account >> dep_audio
+            openai_account >> dep_whisper
             openai_account >> dep_visual
 
         with Cluster("Azure Speech Service"):
@@ -550,11 +553,13 @@ def build_topology_static():
 
         with Cluster("Storage Account + Containers"):
             storage = StorageAccounts("Storage Account (sa-<name>)")
-            # Only 2 containers defined in main.tf (lines 218-228)
+            # 3 containers defined in main.tf
             container_cert = StorageAccounts("Container: certification-materials")
             container_logs = StorageAccounts("Container: interaction-logs")
+            container_prompts = StorageAccounts("Container: prompts")
             storage >> container_cert
             storage >> container_logs
+            storage >> container_prompts
 
         with Cluster("Observability"):
             law = Logs("Log Analytics Workspace (law-PULSE-training-<env>)")
@@ -694,6 +699,7 @@ def render_drawio_dynamic(output_basename: str, infra: ParsedInfrastructure) -> 
         {"name": "Persona-Core-Chat", "capacity": 50},
         {"name": "Persona-High-Reasoning", "capacity": 20},
         {"name": "PULSE-Audio-Realtime", "capacity": 4},
+        {"name": "PULSE-Whisper", "capacity": 1},  # Speech-to-text
         {"name": "Persona-Visual-Asset", "capacity": 0},  # Conditional, often disabled
     ]):
         label = f"Deployment: {dep['name']}"
@@ -712,9 +718,9 @@ def render_drawio_dynamic(output_basename: str, infra: ParsedInfrastructure) -> 
     storage_name = infra.storage_account or "sa-<name>"
     add_vertex("storage", f"Storage Account ({storage_name})", 1260, 520, 280, 180, parent="rg")
 
-    # Only 2 containers defined in main.tf (lines 218-228)
+    # 3 containers defined in main.tf
     containers = infra.storage_containers if infra.storage_containers else [
-        "certification-materials", "interaction-logs"
+        "certification-materials", "interaction-logs", "prompts"
     ]
     cont_y = 560
     for i, container in enumerate(containers[:4]):  # Limit to 4
@@ -785,9 +791,10 @@ def render_drawio_static(output_basename: str) -> None:
             {"name": "Persona-Core-Chat", "capacity": 50},
             {"name": "Persona-High-Reasoning", "capacity": 20},
             {"name": "PULSE-Audio-Realtime", "capacity": 4},
+            {"name": "PULSE-Whisper", "capacity": 1},  # Speech-to-text
             {"name": "Persona-Visual-Asset", "capacity": 0},  # Conditional, often disabled
         ],
-        storage_containers=["certification-materials", "interaction-logs"],
+        storage_containers=["certification-materials", "interaction-logs", "prompts"],
     )
     render_drawio_dynamic(output_basename, infra)
 

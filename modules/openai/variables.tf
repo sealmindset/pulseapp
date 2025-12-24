@@ -119,3 +119,28 @@ variable "openai_public_network_access_enabled" {
   description = "Whether to allow public network access to the Azure OpenAI account. Set to true for testing, false for production."
   default     = false
 }
+
+# Whisper (Speech-to-Text) deployment variables
+variable "openai_model_whisper_id" {
+  type        = string
+  description = "Model ID for PULSE-Whisper deployment (speech-to-text)."
+  default     = "whisper"
+}
+
+variable "openai_model_whisper_version" {
+  type        = string
+  description = "Model version for PULSE-Whisper deployment."
+  default     = "001"
+}
+
+variable "openai_deployment_whisper_sku" {
+  type        = string
+  description = "SKU name for PULSE-Whisper deployment."
+  default     = "Standard"
+}
+
+variable "openai_deployment_whisper_capacity" {
+  type        = number
+  description = "Capacity for PULSE-Whisper deployment."
+  default     = 1
+}

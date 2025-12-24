@@ -33,6 +33,11 @@ output "deployment_persona_visual_asset_name" {
   description = "Deployment name for Persona-Visual-Asset."
 }
 
+output "deployment_PULSE_whisper_name" {
+  value       = azurerm_cognitive_deployment.PULSE_whisper.name
+  description = "Deployment name for PULSE-Whisper (speech-to-text)."
+}
+
 output "primary_key" {
   value       = azurerm_cognitive_account.openai.primary_access_key
   description = "Primary API key for Azure OpenAI."

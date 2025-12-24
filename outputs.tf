@@ -43,6 +43,11 @@ output "interaction_logs_container" {
   value       = azurerm_storage_container.interaction_logs.name
 }
 
+output "prompts_container" {
+  description = "Name of the prompts container."
+  value       = azurerm_storage_container.prompts.name
+}
+
 output "openai_account_name" {
   description = "Name of the Azure OpenAI cognitive account."
   value       = module.openai.cognitive_account_name

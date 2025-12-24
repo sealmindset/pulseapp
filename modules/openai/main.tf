@@ -84,3 +84,19 @@ resource "azurerm_cognitive_deployment" "persona_visual_asset" {
     capacity = var.openai_deployment_visual_asset_capacity
   }
 }
+
+resource "azurerm_cognitive_deployment" "PULSE_whisper" {
+  name                 = "PULSE-Whisper"
+  cognitive_account_id = azurerm_cognitive_account.openai.id
+
+  model {
+    name    = var.openai_model_whisper_id
+    format  = "OpenAI"
+    version = var.openai_model_whisper_version
+  }
+
+  sku {
+    name     = var.openai_deployment_whisper_sku
+    capacity = var.openai_deployment_whisper_capacity
+  }
+}

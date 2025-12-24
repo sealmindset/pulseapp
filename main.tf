@@ -227,6 +227,12 @@ resource "azurerm_storage_container" "interaction_logs" {
   container_access_type = "private"
 }
 
+resource "azurerm_storage_container" "prompts" {
+  name                  = "prompts"
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
+
 ########################
 # Storage Private Endpoint & DNS
 ########################
