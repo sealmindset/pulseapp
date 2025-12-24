@@ -279,24 +279,46 @@ export default function AvatarManagerPage() {
   };
 
   // Delete avatar from preview modal (with confirmation step)
+  // Handles both downloaded avatars (delete files) and catalog avatars (hide from catalog)
   const deleteAvatarFromPreview = async () => {
     if (!previewAvatar) return;
 
+    const isDownloaded = localAvatars.some(la => la.id === previewAvatar.id);
+
     setDeletingAvatar(true);
     try {
-      const response = await fetch(`/api/orchestrator/avatars/local/${encodeURIComponent(previewAvatar.id)}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        // Refresh local avatars list
-        fetchLocalAvatars();
-        // Close confirmation and modal
-        setShowDeleteConfirm(false);
-        setShowAvatarPreviewModal(false);
-        setPreviewAvatar(null);
+      if (isDownloaded) {
+        // Delete downloaded avatar files
+        const response = await fetch(`/api/orchestrator/avatars/local/${encodeURIComponent(previewAvatar.id)}`, {
+          method: "DELETE",
+        });
+        if (response.ok) {
+          // Refresh local avatars list
+          fetchLocalAvatars();
+          // Close confirmation and modal
+          setShowDeleteConfirm(false);
+          setShowAvatarPreviewModal(false);
+          setPreviewAvatar(null);
+        } else {
+          const errorData = await response.json();
+          alert(`Failed to delete: ${errorData.error || "Unknown error"}`);
+        }
       } else {
-        const errorData = await response.json();
-        alert(`Failed to delete: ${errorData.error || "Unknown error"}`);
+        // Hide avatar from catalog (not downloaded)
+        const response = await fetch(`/api/orchestrator/avatars/catalog?id=${encodeURIComponent(previewAvatar.id)}`, {
+          method: "DELETE",
+        });
+        if (response.ok) {
+          // Refresh catalog
+          fetchCatalog();
+          // Close confirmation and modal
+          setShowDeleteConfirm(false);
+          setShowAvatarPreviewModal(false);
+          setPreviewAvatar(null);
+        } else {
+          const errorData = await response.json();
+          alert(`Failed to remove from catalog: ${errorData.error || "Unknown error"}`);
+        }
       }
     } catch (error) {
       console.error("Failed to delete avatar:", error);
@@ -1202,18 +1224,16 @@ export default function AvatarManagerPage() {
                 )}
               </div>
               <div className="flex gap-3">
-                {/* Delete button - only show for downloaded avatars */}
-                {localAvatars.some(la => la.id === previewAvatar.id) && (
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Delete
-                  </button>
-                )}
+                {/* Delete button - show for all avatars */}
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  {localAvatars.some(la => la.id === previewAvatar.id) ? "Delete" : "Remove"}
+                </button>
                 <button
                   onClick={() => {
                     setShowAvatarPreviewModal(false);
@@ -1264,85 +1284,103 @@ export default function AvatarManagerPage() {
             </div>
 
             {/* Delete Confirmation Dialog */}
-            {showDeleteConfirm && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-xl">
-                <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md mx-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Delete Avatar?</h3>
-                      <p className="text-sm text-gray-500">This action cannot be undone</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200">
-                        {previewAvatar.thumbnail_url ? (
-                          <img
-                            src={previewAvatar.thumbnail_url}
-                            alt="Avatar"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gray-100 text-2xl">
-                            {previewAvatar.gender === "female" ? "👩" : "👨"}
-                          </div>
-                        )}
+            {showDeleteConfirm && (() => {
+              const isDownloaded = localAvatars.some(la => la.id === previewAvatar.id);
+              return (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-xl">
+                  <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md mx-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDownloaded ? 'bg-red-100' : 'bg-amber-100'}`}>
+                        <svg className={`w-6 h-6 ${isDownloaded ? 'text-red-600' : 'text-amber-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
                       </div>
                       <div>
-                        <div className="font-medium text-gray-900">
-                          {previewAvatar.name || "Unknown"}
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {isDownloaded ? "Delete Avatar?" : "Remove from Catalog?"}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {isDownloaded ? "This action cannot be undone" : "Hide this avatar from the catalog"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200">
+                          {previewAvatar.thumbnail_url ? (
+                            <img
+                              src={previewAvatar.thumbnail_url}
+                              alt="Avatar"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-100 text-2xl">
+                              {previewAvatar.gender === "female" ? "👩" : "👨"}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {previewAvatar.gender} - {previewAvatar.style}
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {previewAvatar.name || "Unknown"}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {previewAvatar.gender} - {previewAvatar.style}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <p className="text-sm text-gray-600 mb-6">
-                    This will permanently delete the avatar files from the server. You can download it again from the catalog if needed.
-                  </p>
+                    <p className="text-sm text-gray-600 mb-6">
+                      {isDownloaded
+                        ? "This will permanently delete the avatar files from the server. You can download it again from the catalog if needed."
+                        : "This will hide the avatar from the Available Avatars catalog. The avatar can be restored by an administrator."
+                      }
+                    </p>
 
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setShowDeleteConfirm(false)}
-                      disabled={deletingAvatar}
-                      className="flex-1 px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={deleteAvatarFromPreview}
-                      disabled={deletingAvatar}
-                      className="flex-1 px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {deletingAvatar ? (
-                        <>
-                          <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Deleting...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Delete Avatar
-                        </>
-                      )}
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        disabled={deletingAvatar}
+                        className="flex-1 px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={deleteAvatarFromPreview}
+                        disabled={deletingAvatar}
+                        className={`flex-1 px-4 py-2 text-sm text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
+                          isDownloaded
+                            ? 'bg-red-600 hover:bg-red-700'
+                            : 'bg-amber-600 hover:bg-amber-700'
+                        }`}
+                      >
+                        {deletingAvatar ? (
+                          <>
+                            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            {isDownloaded ? "Deleting..." : "Removing..."}
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              {isDownloaded ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                              )}
+                            </svg>
+                            {isDownloaded ? "Delete Avatar" : "Remove from Catalog"}
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}

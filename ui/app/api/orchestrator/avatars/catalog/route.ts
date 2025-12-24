@@ -2,9 +2,43 @@
 // Avatar Catalog API - Returns available avatars from ModelScope catalog
 // =============================================================================
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 
 export const dynamic = "force-dynamic";
+
+// Data directory for catalog settings
+const DATA_DIR = process.env.AVATARS_DATA_DIR || path.join(process.cwd(), "data", "avatars");
+const HIDDEN_AVATARS_FILE = path.join(DATA_DIR, "hidden-avatars.json");
+
+interface HiddenAvatarsData {
+  hidden: string[]; // Array of avatar IDs that have been hidden/removed from catalog
+}
+
+function ensureDataDir() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+}
+
+function loadHiddenAvatars(): HiddenAvatarsData {
+  ensureDataDir();
+  if (fs.existsSync(HIDDEN_AVATARS_FILE)) {
+    try {
+      const data = fs.readFileSync(HIDDEN_AVATARS_FILE, "utf-8");
+      return JSON.parse(data);
+    } catch {
+      return { hidden: [] };
+    }
+  }
+  return { hidden: [] };
+}
+
+function saveHiddenAvatars(data: HiddenAvatarsData) {
+  ensureDataDir();
+  fs.writeFileSync(HIDDEN_AVATARS_FILE, JSON.stringify(data, null, 2));
+}
 
 // Avatar catalog from ModelScope LiteAvatar Gallery
 // https://modelscope.cn/models/HumanAIGC-Engineering/LiteAvatarGallery
@@ -42,12 +76,18 @@ const BASE_URL = "https://modelscope.cn/models/HumanAIGC-Engineering/LiteAvatarG
 
 export async function GET() {
   try {
+    // Load hidden avatars list
+    const hiddenData = loadHiddenAvatars();
+
     // Build catalog with thumbnail URLs - all thumbnails are local
-    const avatars = AVATAR_CATALOG.map((avatar) => ({
-      ...avatar,
-      thumbnail_url: `/avatars/${avatar.id}.png`,
-      download_url: `${BASE_URL}/${avatar.id}.zip`,
-    }));
+    // Filter out hidden avatars
+    const avatars = AVATAR_CATALOG
+      .filter((avatar) => !hiddenData.hidden.includes(avatar.id))
+      .map((avatar) => ({
+        ...avatar,
+        thumbnail_url: `/avatars/${avatar.id}.png`,
+        download_url: `${BASE_URL}/${avatar.id}.zip`,
+      }));
 
     // Group by batch
     const batches = [
@@ -64,11 +104,62 @@ export async function GET() {
       batches,
       avatars,
       total: avatars.length,
+      hidden_count: hiddenData.hidden.length,
     });
   } catch (error) {
     console.error("Failed to fetch avatar catalog:", error);
     return NextResponse.json(
       { error: "Failed to fetch avatar catalog" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Hide/remove an avatar from the catalog
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const avatarId = searchParams.get("id");
+
+    if (!avatarId) {
+      return NextResponse.json(
+        { error: "Avatar ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Check if avatar exists in catalog
+    const avatar = AVATAR_CATALOG.find((a) => a.id === avatarId);
+    if (!avatar) {
+      return NextResponse.json(
+        { error: "Avatar not found in catalog" },
+        { status: 404 }
+      );
+    }
+
+    // Load current hidden list and add this avatar
+    const hiddenData = loadHiddenAvatars();
+
+    if (hiddenData.hidden.includes(avatarId)) {
+      return NextResponse.json(
+        { error: "Avatar is already hidden" },
+        { status: 400 }
+      );
+    }
+
+    hiddenData.hidden.push(avatarId);
+    saveHiddenAvatars(hiddenData);
+
+    return NextResponse.json({
+      success: true,
+      message: `Avatar "${avatar.name}" removed from catalog`,
+      hidden_id: avatarId,
+      hidden_count: hiddenData.hidden.length,
+    });
+  } catch (error) {
+    console.error("Failed to hide avatar:", error);
+    return NextResponse.json(
+      { error: "Failed to remove avatar from catalog" },
       { status: 500 }
     );
   }
