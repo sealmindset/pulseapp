@@ -1,5 +1,36 @@
 # Changelog
 
+## 2025-12-24
+
+### Avatar Manager Enhancements
+- **Catalog Delete/Hide Functionality**: Added ability to remove avatars from the Available Avatars catalog
+  - Created file-based storage system (`hidden-avatars.json`) for tracking hidden avatars
+  - Added DELETE endpoint to `/api/orchestrator/avatars/catalog` to hide avatars from catalog
+  - Avatars can be restored by editing the `data/avatars/hidden-avatars.json` file
+  - Hidden avatar count displayed in catalog API response
+
+- **Avatar Preview Modal Updates**:
+  - Delete/Remove button now shows for all avatars in preview modal
+  - Differentiated UX for downloaded vs catalog avatars:
+    - **Downloaded avatars**: Red confirmation dialog, "Delete" button, permanently removes files
+    - **Catalog avatars**: Amber confirmation dialog, "Remove" button, hides from catalog only
+  - Confirmation dialogs explain the action clearly to prevent accidental deletions
+
+### Training Page User Identity Fix
+- Fixed the Training > PULSE Sales Training user info card to display the actual logged-in user
+- Previously showed hardcoded "Demo User" regardless of who was logged in
+- Now correctly displays:
+  - User's name from auth context (`user?.name`)
+  - Computed initials in avatar circle (e.g., "RV" for "Rob Vance")
+  - Falls back to "Guest" and "?" if no user is authenticated
+
+### Files Modified
+- `ui/app/api/orchestrator/avatars/catalog/route.ts` - Added DELETE endpoint and hidden avatars storage
+- `ui/app/admin/avatars/page.tsx` - Updated delete functionality for all avatar types
+- `ui/app/training/page.tsx` - Fixed user display using `useAuth()` hook
+
+---
+
 ## 2025-12-20 (Session 2)
 
 ### Admin Authentication & Authorization Management
