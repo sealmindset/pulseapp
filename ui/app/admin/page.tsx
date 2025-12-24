@@ -121,7 +121,7 @@ export default function AdminPage() {
           </Link>
 
           {/* Authentication & Authorization Card */}
-          <Link 
+          <Link
             href="/admin/auth"
             className="group relative bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] cursor-pointer overflow-hidden"
           >
@@ -130,7 +130,7 @@ export default function AdminPage() {
               <div className="absolute top-4 right-4 w-32 h-32 border-4 border-white rounded-full"></div>
               <div className="absolute bottom-4 left-4 w-20 h-20 border-4 border-white rounded-full"></div>
             </div>
-            
+
             <div className="relative">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -143,7 +143,7 @@ export default function AdminPage() {
                   <p className="text-white/70 text-sm">Users, roles, SSO/SAML</p>
                 </div>
               </div>
-              
+
               <div className="space-y-2 mb-6">
                 <div className="flex items-center gap-2 text-sm text-white/80">
                   <span className="w-2 h-2 rounded-full bg-green-400"></span>
@@ -162,9 +162,61 @@ export default function AdminPage() {
                   <span>Security Policies</span>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2 text-sm font-medium group-hover:gap-3 transition-all">
                 <span>Manage Security</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </div>
+          </Link>
+
+          {/* Avatar Manager Card */}
+          <Link
+            href="/admin/avatars"
+            className="group relative bg-gradient-to-br from-pink-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] cursor-pointer overflow-hidden"
+          >
+            {/* Background Pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-4 right-4 w-32 h-32 border-4 border-white rounded-full"></div>
+              <div className="absolute bottom-4 left-4 w-20 h-20 border-4 border-white rounded-full"></div>
+            </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Avatar Manager</h2>
+                  <p className="text-white/70 text-sm">Local avatars & voices</p>
+                </div>
+              </div>
+
+              <div className="space-y-2 mb-6">
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="w-2 h-2 rounded-full bg-green-400"></span>
+                  <span>ModelScope LiteAvatars</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
+                  <span>Piper TTS Voices</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                  <span>Download & Manage</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                  <span>Demo Mode Preview</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-sm font-medium group-hover:gap-3 transition-all">
+                <span>Manage Avatars</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>

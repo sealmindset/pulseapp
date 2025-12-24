@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { ImageCarousel, VoiceCarousel } from "@/components/ImageCarousel";
 
 // ============================================================================
 // TYPES
@@ -59,16 +60,38 @@ interface AgentConfigVersion {
   evaluators: Record<string, ScoringCriterion[]>;
 }
 
-// Available options
-const AVATAR_OPTIONS = [
-  { value: "lisa / casual-sitting", label: "Lisa / Casual Sitting" },
-];
-
+// Available voice options (legacy dropdown)
 const VOICE_OPTIONS = [
   { value: "en-US-JennyNeural", label: "Jenny", style: "customerservice" },
   { value: "en-US-SaraNeural", label: "Sara", style: "friendly" },
   { value: "en-US-AriaNeural", label: "Aria", style: "cheerful" },
   { value: "en-US-MichelleNeural", label: "Michelle", style: "calm" },
+];
+
+// Extended avatar catalog for carousel (demo mode)
+const AVATAR_CATALOG = [
+  { id: "lisa", name: "Lisa", gender: "female" as const, style: "casual-sitting", thumbnailUrl: "/avatars/P1-aEYbtyyVpaMF2dSSpMxCw.png" },
+  { id: "aria", name: "Aria", gender: "female" as const, style: "casual-sitting", thumbnailUrl: "/avatars/P1lXrpJL507-PZ4hMPutyF7A.png" },
+  { id: "bella", name: "Bella", gender: "female" as const, style: "casual-sitting" },
+  { id: "clara", name: "Clara", gender: "female" as const, style: "casual-sitting" },
+  { id: "diana", name: "Diana", gender: "female" as const, style: "casual-sitting" },
+  { id: "elena", name: "Elena", gender: "female" as const, style: "casual-sitting" },
+  { id: "alex", name: "Alex", gender: "male" as const, style: "casual-sitting" },
+  { id: "brian", name: "Brian", gender: "male" as const, style: "casual-sitting" },
+  { id: "chris", name: "Chris", gender: "male" as const, style: "casual-sitting" },
+  { id: "david", name: "David", gender: "male" as const, style: "casual-sitting" },
+];
+
+// Extended voice options for carousel
+const VOICE_OPTIONS_FULL = [
+  { id: "en-US-JennyNeural", name: "Jenny", gender: "female" as const, provider: "azure", style: "customerservice" },
+  { id: "en-US-SaraNeural", name: "Sara", gender: "female" as const, provider: "azure", style: "friendly" },
+  { id: "en-US-AriaNeural", name: "Aria", gender: "female" as const, provider: "azure", style: "cheerful" },
+  { id: "en-US-MichelleNeural", name: "Michelle", gender: "female" as const, provider: "azure", style: "calm" },
+  { id: "en-US-GuyNeural", name: "Guy", gender: "male" as const, provider: "azure", style: "newscast" },
+  { id: "en-US-DavisNeural", name: "Davis", gender: "male" as const, provider: "azure", style: "friendly" },
+  { id: "en-US-TonyNeural", name: "Tony", gender: "male" as const, provider: "azure", style: "cheerful" },
+  { id: "en-US-JasonNeural", name: "Jason", gender: "male" as const, provider: "azure", style: "calm" },
 ];
 
 const STORAGE_KEY = "pulse_personas";
@@ -796,39 +819,50 @@ function PersonaEditModal({ persona, versions, isOpen, onClose, onSave, onRevert
             />
           </div>
 
-          {/* Avatar Selection */}
+          {/* Avatar Selection with Carousel */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Avatar</label>
-            <select
-              value={`${editedPersona.avatar.character} / ${editedPersona.avatar.style}`}
-              onChange={(e) => {
-                const [character, style] = e.target.value.split(" / ");
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Avatar Selection
+              <span className="ml-2 text-xs text-amber-600 font-normal">(Demo - Lisa active in training)</span>
+            </label>
+            <ImageCarousel
+              items={AVATAR_CATALOG.map((a) => ({
+                id: a.id,
+                name: a.name,
+                thumbnailUrl: a.thumbnailUrl,
+                gender: a.gender,
+                style: a.style,
+              }))}
+              selectedId={editedPersona.avatar.character}
+              onSelect={(item) => {
                 setEditedPersona((prev) => ({
                   ...prev,
-                  avatar: { ...prev.avatar, character, style },
+                  avatar: { ...prev.avatar, character: item.id, style: item.style || "casual-sitting" },
                 }));
                 setHasChanges(true);
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-            >
-              {AVATAR_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+              itemsPerView={4}
+            />
           </div>
 
-          {/* Voice Selection */}
+          {/* Voice Selection with Carousel */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Voice</label>
-            <select
-              value={editedPersona.avatar.voice}
-              onChange={(e) => handleChange("voice", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-            >
-              {VOICE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Voice Selection
+              <span className="ml-2 text-xs text-gray-500 font-normal">Azure Neural Voices</span>
+            </label>
+            <VoiceCarousel
+              items={VOICE_OPTIONS_FULL}
+              selectedId={editedPersona.avatar.voice}
+              onSelect={(item) => {
+                setEditedPersona((prev) => ({
+                  ...prev,
+                  avatar: { ...prev.avatar, voice: item.id, voiceStyle: item.style },
+                }));
+                setHasChanges(true);
+              }}
+              itemsPerView={4}
+            />
           </div>
 
           {/* Greetings */}
