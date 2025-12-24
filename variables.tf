@@ -267,3 +267,50 @@ variable "openai_public_network_access_enabled" {
   description = "Whether to allow public network access to the Azure OpenAI account. Set to true for testing, false for production."
   default     = false
 }
+
+# =============================================================================
+# OIDC / SSO Configuration
+# =============================================================================
+
+variable "auth_mode" {
+  type        = string
+  description = "Authentication mode: 'demo' for local development, 'sso' for Microsoft Entra ID SSO."
+  default     = "demo"
+
+  validation {
+    condition     = contains(["demo", "sso"], var.auth_mode)
+    error_message = "auth_mode must be either 'demo' or 'sso'."
+  }
+}
+
+variable "azure_ad_client_id" {
+  type        = string
+  description = "Microsoft Entra ID (Azure AD) application client ID for OIDC authentication."
+  default     = ""
+}
+
+variable "azure_ad_client_secret" {
+  type        = string
+  description = "Microsoft Entra ID (Azure AD) application client secret for OIDC authentication."
+  sensitive   = true
+  default     = ""
+}
+
+variable "azure_ad_tenant_id" {
+  type        = string
+  description = "Microsoft Entra ID (Azure AD) tenant ID for OIDC authentication."
+  default     = ""
+}
+
+variable "nextauth_secret" {
+  type        = string
+  description = "Secret used by NextAuth.js for session encryption. Generate with: openssl rand -base64 32"
+  sensitive   = true
+  default     = ""
+}
+
+variable "nextauth_url" {
+  type        = string
+  description = "The canonical URL of the PULSE application (e.g., https://pulse-training.azurewebsites.net)."
+  default     = ""
+}

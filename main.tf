@@ -369,6 +369,14 @@ module "app" {
   # Azure Speech Avatar configuration
   speech_region = module.speech.speech_region
   speech_key    = module.speech.speech_key
+
+  # OIDC / SSO Configuration
+  auth_mode              = var.auth_mode
+  azure_ad_client_id     = var.azure_ad_client_id
+  azure_ad_client_secret = var.azure_ad_client_secret
+  azure_ad_tenant_id     = var.azure_ad_tenant_id
+  nextauth_secret        = var.nextauth_secret
+  nextauth_url           = var.nextauth_url
 }
 
 ########################

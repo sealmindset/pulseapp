@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 // ============================================================================
@@ -1867,7 +1867,7 @@ function StageEditModal({ stage, versions, isOpen, onClose, onSave }: StageEditM
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-export default function AdminOverviewPage() {
+function AdminOverviewContent() {
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab") as TabType | null;
   const [activeTab, setActiveTab] = useState<TabType>(tabFromUrl || "personas");
@@ -2645,5 +2645,14 @@ export default function AdminOverviewPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Wrapper with Suspense for useSearchParams
+export default function AdminOverviewPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading...</div>}>
+      <AdminOverviewContent />
+    </Suspense>
   );
 }

@@ -150,8 +150,8 @@ export default function FeedbackPage() {
 
   // Load session history for current user
   useEffect(() => {
-    if (typeof window !== "undefined" && user?.username) {
-      const key = `${SESSION_HISTORY_KEY}_${user.username}`;
+    if (typeof window !== "undefined" && user?.id) {
+      const key = `${SESSION_HISTORY_KEY}_${user.id}`;
       const stored = localStorage.getItem(key);
       if (stored) {
         try {
@@ -159,7 +159,7 @@ export default function FeedbackPage() {
         } catch {}
       }
     }
-  }, [user?.username]);
+  }, [user?.id]);
 
   // Fetch feedback and generate AI analysis
   useEffect(() => {
@@ -182,8 +182,8 @@ export default function FeedbackPage() {
           setAiFeedback(aiAnalysis);
           
           // Save to session history if we have a valid outcome
-          if (user?.username && outcome !== "incomplete") {
-            const historyKey = `${SESSION_HISTORY_KEY}_${user.username}`;
+          if (user?.id && outcome !== "incomplete") {
+            const historyKey = `${SESSION_HISTORY_KEY}_${user.id}`;
             const newSession: SessionHistory = {
               sessionId,
               date: new Date().toISOString(),
@@ -212,7 +212,7 @@ export default function FeedbackPage() {
     }
     run();
     return () => { cancelled = true; };
-  }, [sessionId, personaInfo?.type, user?.username]);
+  }, [sessionId, personaInfo?.type, user?.id]);
 
   const scorePct = useMemo(() => {
     const raw = feedback?.overallScore ?? feedback?.score ?? feedback?.mastery;
@@ -249,7 +249,7 @@ export default function FeedbackPage() {
           <h1 className="text-2xl font-semibold">Feedback & Scoring</h1>
           <p className="text-sm text-gray-600">
             AI-powered analysis of your training sessions
-            {user?.username && <span className="ml-2 text-blue-600">• Logged in as: {user.username}</span>}
+            {user?.name && <span className="ml-2 text-blue-600">• Logged in as: {user.name}</span>}
           </p>
         </div>
         {aiFeedback && (

@@ -57,3 +57,13 @@ openai_public_network_access_enabled = true
 openai_deployment_core_chat_capacity      = 50   # Main persona conversations
 openai_deployment_high_reasoning_capacity = 20   # Evaluation/scoring
 openai_deployment_audio_realtime_capacity = 4    # Real-time voice STT/TTS (quota limit: 6, current usage: 2)
+
+# =============================================================================
+# OIDC / SSO Configuration - Microsoft Entra ID
+# =============================================================================
+auth_mode              = "sso"
+azure_ad_client_id     = "9196744b-cf41-4197-9361-0eebccb3ffb6"
+azure_ad_client_secret = "_878Q~jdijYxxlchYVk_DKXESvf.u2OM-HqOaaGS"
+azure_ad_tenant_id     = "ed8aabd5-14de-4982-9fb6-d6528851af5e"
+nextauth_secret        = "lfyQ4E4j+CoNjxEQFkV/H95nTvnU08J0q5/ISyzpQ60="
+nextauth_url           = ""  # Will be auto-generated from web app name

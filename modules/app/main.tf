@@ -65,6 +65,14 @@ resource "azurerm_linux_web_app" "PULSE_ui_api" {
 
     # Function App URL for API proxy routes
     "FUNCTION_APP_BASE_URL" = "https://${local.function_app_name}.azurewebsites.net/api"
+
+    # OIDC / SSO Configuration
+    "AUTH_MODE"              = var.auth_mode
+    "AZURE_AD_CLIENT_ID"     = var.azure_ad_client_id
+    "AZURE_AD_CLIENT_SECRET" = var.azure_ad_client_secret
+    "AZURE_AD_TENANT_ID"     = var.azure_ad_tenant_id
+    "NEXTAUTH_SECRET"        = var.nextauth_secret
+    "NEXTAUTH_URL"           = var.nextauth_url != "" ? var.nextauth_url : "https://${local.web_app_name}.azurewebsites.net"
   }
 
   tags = merge(var.common_tags, { service_role = "ui-api" })

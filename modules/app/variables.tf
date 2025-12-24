@@ -151,3 +151,42 @@ variable "speech_key" {
   sensitive   = true
   default     = ""
 }
+
+# OIDC / SSO Configuration
+variable "auth_mode" {
+  type        = string
+  description = "Authentication mode: 'demo' or 'sso'."
+  default     = "demo"
+}
+
+variable "azure_ad_client_id" {
+  type        = string
+  description = "Microsoft Entra ID application client ID."
+  default     = ""
+}
+
+variable "azure_ad_client_secret" {
+  type        = string
+  description = "Microsoft Entra ID application client secret."
+  sensitive   = true
+  default     = ""
+}
+
+variable "azure_ad_tenant_id" {
+  type        = string
+  description = "Microsoft Entra ID tenant ID."
+  default     = ""
+}
+
+variable "nextauth_secret" {
+  type        = string
+  description = "Secret for NextAuth.js session encryption."
+  sensitive   = true
+  default     = ""
+}
+
+variable "nextauth_url" {
+  type        = string
+  description = "The canonical URL of the PULSE application."
+  default     = ""
+}
