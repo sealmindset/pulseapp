@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useAuth } from "@/components/AuthContext";
 
 // ============================================================================
 // PULSE STAGES DATA - Comprehensive training content for each stage
@@ -569,6 +570,7 @@ function TrainerFeedback({ feedback, nextQuestion }: TrainerFeedbackProps) {
 // MAIN TRAINING PAGE
 // ============================================================================
 export default function TrainingPage() {
+  const { user } = useAuth();
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel | null>(null);
   const [selectedStage, setSelectedStage] = useState<PulseStage | null>(null);
   const [trainerFeedback, setTrainerFeedback] = useState<string | null>(null);
@@ -767,12 +769,12 @@ export default function TrainingPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                  D
+                  {user?.name?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "?"}
                 </div>
                 <div className="flex-1">
-                  <div className="font-semibold text-gray-900">Demo User</div>
+                  <div className="font-semibold text-gray-900">{user?.name || "Guest"}</div>
                   <div className="text-sm text-gray-500">
-                    {experienceLevel 
+                    {experienceLevel
                       ? `${EXPERIENCE_LEVELS.find(l => l.id === experienceLevel)?.icon} ${EXPERIENCE_LEVELS.find(l => l.id === experienceLevel)?.name}`
                       : "Select level above"
                     }
