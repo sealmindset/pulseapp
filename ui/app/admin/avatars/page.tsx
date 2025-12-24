@@ -129,9 +129,12 @@ export default function AvatarManagerPage() {
   // Avatar preview modal state
   const [showAvatarPreviewModal, setShowAvatarPreviewModal] = useState(false);
   const [previewAvatar, setPreviewAvatar] = useState<CatalogAvatar | null>(null);
-  const [carouselSelectedId, setCarouselSelectedId] = useState<string>("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingAvatar, setDeletingAvatar] = useState(false);
+
+  // View mode state (carousel vs grid)
+  const [downloadedViewMode, setDownloadedViewMode] = useState<"grid" | "carousel">("grid");
+  const [availableViewMode, setAvailableViewMode] = useState<"grid" | "carousel">("grid");
 
   // Fetch local avatars
   const fetchLocalAvatars = useCallback(async () => {
@@ -256,7 +259,6 @@ export default function AvatarManagerPage() {
   // Open avatar preview modal
   const openAvatarPreview = (avatar: CatalogAvatar) => {
     setPreviewAvatar(avatar);
-    setCarouselSelectedId(avatar.id);
     setShowAvatarPreviewModal(true);
   };
 
@@ -278,11 +280,11 @@ export default function AvatarManagerPage() {
 
   // Delete avatar from preview modal (with confirmation step)
   const deleteAvatarFromPreview = async () => {
-    if (!carouselSelectedId) return;
+    if (!previewAvatar) return;
 
     setDeletingAvatar(true);
     try {
-      const response = await fetch(`/api/orchestrator/avatars/local/${encodeURIComponent(carouselSelectedId)}`, {
+      const response = await fetch(`/api/orchestrator/avatars/local/${encodeURIComponent(previewAvatar.id)}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -460,186 +462,365 @@ export default function AvatarManagerPage() {
             {/* Downloaded Avatars Section */}
             {localAvatars.length > 0 && (
               <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                  Downloaded Avatars ({localAvatars.filter((a: LocalAvatar) => avatarFilter === "all" || a.gender === avatarFilter).length})
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                  {localAvatars
-                    .filter((a: LocalAvatar) => avatarFilter === "all" || a.gender === avatarFilter)
-                    .map((avatar: LocalAvatar) => (
-                      <div
-                        key={avatar.id}
-                        className="bg-white rounded-lg border-2 border-green-200 overflow-hidden relative"
-                      >
-                        <div className="absolute top-2 right-2 z-10">
-                          <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
-                            ✓ Downloaded
-                          </span>
-                        </div>
-                        <div className="aspect-square bg-gray-100 flex items-center justify-center">
-                          <span className="text-4xl">👤</span>
-                        </div>
-                        <div className="p-3">
-                          <div className="flex items-start justify-between mb-1">
-                            <h3 className="font-medium text-gray-900 text-sm">{avatar.name}</h3>
-                            <span
-                              className={`px-1.5 py-0.5 text-xs rounded ${
-                                avatar.gender === "female"
-                                  ? "bg-pink-100 text-pink-700"
-                                  : "bg-blue-100 text-blue-700"
-                              }`}
-                            >
-                              {avatar.gender}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            <span>{avatar.size_mb} MB</span>
-                            <span className="mx-1">•</span>
-                            <span>{avatar.style}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Downloaded Avatars ({localAvatars.filter((a: LocalAvatar) => avatarFilter === "all" || a.gender === avatarFilter).length})
+                  </h3>
+                  {/* View Toggle */}
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setDownloadedViewMode("carousel")}
+                      className={`p-1.5 rounded-md transition-colors ${
+                        downloadedViewMode === "carousel"
+                          ? "bg-white shadow-sm text-purple-600"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      title="Carousel view"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setDownloadedViewMode("grid")}
+                      className={`p-1.5 rounded-md transition-colors ${
+                        downloadedViewMode === "grid"
+                          ? "bg-white shadow-sm text-purple-600"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      title="Grid view"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* Available Avatars Section */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                Available Avatars ({catalogAvatars.filter((a: CatalogAvatar) => avatarFilter === "all" || a.gender === avatarFilter).length})
-              </h3>
-              {loadingCatalog ? (
-                <div className="text-center py-12 text-gray-500">Loading catalog...</div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                  {catalogAvatars
-                    .filter((a: CatalogAvatar) => avatarFilter === "all" || a.gender === avatarFilter)
-                    .map((avatar: CatalogAvatar) => {
-                      const isDownloaded = localAvatars.some((la: LocalAvatar) => la.id === avatar.id);
-                      const isDownloading = downloadingAvatar === avatar.id || !!downloadJobs[avatar.id];
-                      const job = downloadJobs[avatar.id];
+                {/* Carousel View */}
+                {downloadedViewMode === "carousel" && (
+                  <div className="bg-white rounded-xl border border-green-200 p-4">
+                    <ImageCarousel
+                      items={localAvatars
+                        .filter((a: LocalAvatar) => avatarFilter === "all" || a.gender === avatarFilter)
+                        .map((avatar: LocalAvatar) => {
+                          const catalogAvatar = catalogAvatars.find((ca: CatalogAvatar) => ca.id === avatar.id);
+                          return {
+                            id: avatar.id,
+                            name: avatar.name,
+                            thumbnailUrl: catalogAvatar?.thumbnail_url,
+                            gender: avatar.gender as "female" | "male",
+                            style: avatar.style,
+                          };
+                        })}
+                      selectedId={localAvatars.filter((a: LocalAvatar) => avatarFilter === "all" || a.gender === avatarFilter)[0]?.id || ""}
+                      onSelect={(item) => {
+                        const catalogAvatar = catalogAvatars.find((ca: CatalogAvatar) => ca.id === item.id);
+                        const localAvatar = localAvatars.find((la: LocalAvatar) => la.id === item.id);
+                        if (catalogAvatar) {
+                          openAvatarPreview(catalogAvatar);
+                        } else if (localAvatar) {
+                          openAvatarPreview({
+                            id: localAvatar.id,
+                            name: localAvatar.name,
+                            gender: localAvatar.gender as "female" | "male" | "unknown",
+                            style: localAvatar.style,
+                            batch: "",
+                            size_mb: localAvatar.size_mb,
+                          });
+                        }
+                      }}
+                      itemsPerView={5}
+                      showNames={true}
+                    />
+                  </div>
+                )}
 
-                      return (
-                        <div
-                          key={avatar.id}
-                          className={`bg-white rounded-lg border overflow-hidden transition-all ${
-                            isDownloaded
-                              ? "border-green-200 bg-green-50"
-                              : "border-gray-200 hover:border-blue-300 hover:shadow-md"
-                          }`}
-                        >
-                          {/* Thumbnail - clickable to open preview modal */}
+                {/* Grid View */}
+                {downloadedViewMode === "grid" && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {localAvatars
+                      .filter((a: LocalAvatar) => avatarFilter === "all" || a.gender === avatarFilter)
+                      .map((avatar: LocalAvatar) => {
+                        // Find the corresponding catalog avatar for thumbnail
+                        const catalogAvatar = catalogAvatars.find((ca: CatalogAvatar) => ca.id === avatar.id);
+                        const thumbnailUrl = catalogAvatar?.thumbnail_url;
+
+                        return (
                           <div
-                            className="relative aspect-square bg-gray-100 cursor-pointer group"
-                            onClick={() => openAvatarPreview(avatar)}
+                            key={avatar.id}
+                            className="bg-white rounded-lg border-2 border-green-200 overflow-hidden relative hover:shadow-md transition-all"
                           >
-                            {avatar.thumbnail_url ? (
-                              <img
-                                src={avatar.thumbnail_url}
-                                alt={avatar.name}
-                                className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                <span className="text-4xl">👤</span>
+                            {/* Thumbnail - clickable to open preview modal */}
+                            <div
+                              className="relative aspect-square bg-gray-100 cursor-pointer group"
+                              onClick={() => {
+                                // Use catalog avatar if available, otherwise create one from local data
+                                const avatarForPreview: CatalogAvatar = catalogAvatar || {
+                                  id: avatar.id,
+                                  name: avatar.name,
+                                  gender: avatar.gender as "female" | "male" | "unknown",
+                                  style: avatar.style,
+                                  batch: "",
+                                  size_mb: avatar.size_mb,
+                                  thumbnail_url: thumbnailUrl,
+                                };
+                                openAvatarPreview(avatarForPreview);
+                              }}
+                            >
+                              {thumbnailUrl ? (
+                                <img
+                                  src={thumbnailUrl}
+                                  alt={avatar.name}
+                                  className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                  <span className="text-4xl">{avatar.gender === "female" ? "👩" : "👨"}</span>
+                                </div>
+                              )}
+                              {/* Hover overlay */}
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                                <span className="opacity-0 group-hover:opacity-100 text-white bg-black/50 px-2 py-1 rounded text-xs transition-opacity">
+                                  Click to preview
+                                </span>
                               </div>
-                            )}
-                            {/* Hover overlay */}
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
-                              <span className="opacity-0 group-hover:opacity-100 text-white bg-black/50 px-2 py-1 rounded text-xs transition-opacity">
-                                Click to preview
-                              </span>
-                            </div>
-                            {isDownloaded && (
+                              {/* Downloaded badge */}
                               <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                 </svg>
                               </div>
-                            )}
-                          </div>
-
-                          {/* Info */}
-                          <div className="p-3">
-                            <div className="flex items-start justify-between mb-1">
-                              <h3 className="font-medium text-gray-900 text-sm">{avatar.name}</h3>
-                              <span
-                                className={`px-1.5 py-0.5 text-xs rounded ${
-                                  avatar.gender === "female"
-                                    ? "bg-pink-100 text-pink-700"
-                                    : "bg-blue-100 text-blue-700"
-                                }`}
-                              >
-                                {avatar.gender}
-                              </span>
                             </div>
-
-                            <div className="text-xs text-gray-500 mb-2">
-                              <span>{avatar.size_mb} MB</span>
-                              <span className="mx-1">•</span>
-                              <span>{avatar.style}</span>
-                            </div>
-
-                            {isDownloaded ? (
-                              <span className="block w-full px-3 py-1.5 text-xs text-center bg-green-100 text-green-700 rounded">
-                                ✓ Downloaded
-                              </span>
-                            ) : isDownloading ? (
-                              <div>
-                                <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
-                                  <div
-                                    className="bg-blue-500 h-2 rounded-full transition-all animate-pulse"
-                                    style={{ width: `${job?.progress || 10}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs text-blue-600">{job?.message || "Starting..."}</span>
+                            <div className="p-3">
+                              <div className="flex items-start justify-between mb-1">
+                                <h3 className="font-medium text-gray-900 text-sm">{avatar.name}</h3>
+                                <span
+                                  className={`px-1.5 py-0.5 text-xs rounded ${
+                                    avatar.gender === "female"
+                                      ? "bg-pink-100 text-pink-700"
+                                      : "bg-blue-100 text-blue-700"
+                                  }`}
+                                >
+                                  {avatar.gender}
+                                </span>
                               </div>
-                            ) : (
-                              <button
-                                onClick={async () => {
-                                  setDownloadingAvatar(avatar.id);
-                                  setSelectedAvatar(avatar);
-                                  setDownloadName(avatar.name);
-                                  setDownloadGender(avatar.gender === "male" ? "male" : "female");
-
-                                  try {
-                                    const response = await fetch("/api/orchestrator/avatars/download", {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({
-                                        avatar_id: avatar.id,
-                                        name: avatar.name,
-                                        gender: avatar.gender,
-                                        style: avatar.style,
-                                      }),
-                                    });
-
-                                    if (response.ok) {
-                                      const data = await response.json();
-                                      pollDownloadStatus(data.job_id, avatar.id);
-                                    }
-                                  } catch (error) {
-                                    console.error("Failed to start download:", error);
-                                  } finally {
-                                    setDownloadingAvatar(null);
-                                  }
-                                }}
-                                className="w-full px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                              >
-                                ⬇️ Download
-                              </button>
-                            )}
+                              <div className="text-xs text-gray-500">
+                                <span>{avatar.size_mb} MB</span>
+                                <span className="mx-1">•</span>
+                                <span>{avatar.style}</span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Available Avatars Section */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  Available Avatars ({catalogAvatars.filter((a: CatalogAvatar) => avatarFilter === "all" || a.gender === avatarFilter).length})
+                </h3>
+                {/* View Toggle */}
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setAvailableViewMode("carousel")}
+                    className={`p-1.5 rounded-md transition-colors ${
+                      availableViewMode === "carousel"
+                        ? "bg-white shadow-sm text-purple-600"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                    title="Carousel view"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setAvailableViewMode("grid")}
+                    className={`p-1.5 rounded-md transition-colors ${
+                      availableViewMode === "grid"
+                        ? "bg-white shadow-sm text-purple-600"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                    title="Grid view"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  </button>
                 </div>
+              </div>
+
+              {loadingCatalog ? (
+                <div className="text-center py-12 text-gray-500">Loading catalog...</div>
+              ) : (
+                <>
+                  {/* Carousel View */}
+                  {availableViewMode === "carousel" && (
+                    <div className="bg-white rounded-xl border border-blue-200 p-4">
+                      <ImageCarousel
+                        items={catalogAvatars
+                          .filter((a: CatalogAvatar) => avatarFilter === "all" || a.gender === avatarFilter)
+                          .map((avatar: CatalogAvatar) => ({
+                            id: avatar.id,
+                            name: avatar.name,
+                            thumbnailUrl: avatar.thumbnail_url,
+                            gender: avatar.gender === "unknown" ? undefined : avatar.gender,
+                            style: avatar.style,
+                          }))}
+                        selectedId={catalogAvatars.filter((a: CatalogAvatar) => avatarFilter === "all" || a.gender === avatarFilter)[0]?.id || ""}
+                        onSelect={(item) => {
+                          const avatar = catalogAvatars.find((a: CatalogAvatar) => a.id === item.id);
+                          if (avatar) {
+                            openAvatarPreview(avatar);
+                          }
+                        }}
+                        itemsPerView={5}
+                        showNames={true}
+                      />
+                    </div>
+                  )}
+
+                  {/* Grid View */}
+                  {availableViewMode === "grid" && (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {catalogAvatars
+                        .filter((a: CatalogAvatar) => avatarFilter === "all" || a.gender === avatarFilter)
+                        .map((avatar: CatalogAvatar) => {
+                          const isDownloaded = localAvatars.some((la: LocalAvatar) => la.id === avatar.id);
+                          const isDownloading = downloadingAvatar === avatar.id || !!downloadJobs[avatar.id];
+                          const job = downloadJobs[avatar.id];
+
+                          return (
+                            <div
+                              key={avatar.id}
+                              className={`bg-white rounded-lg border overflow-hidden transition-all ${
+                                isDownloaded
+                                  ? "border-green-200 bg-green-50"
+                                  : "border-gray-200 hover:border-blue-300 hover:shadow-md"
+                              }`}
+                            >
+                              {/* Thumbnail - clickable to open preview modal */}
+                              <div
+                                className="relative aspect-square bg-gray-100 cursor-pointer group"
+                                onClick={() => openAvatarPreview(avatar)}
+                              >
+                                {avatar.thumbnail_url ? (
+                                  <img
+                                    src={avatar.thumbnail_url}
+                                    alt={avatar.name}
+                                    className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                    <span className="text-4xl">👤</span>
+                                  </div>
+                                )}
+                                {/* Hover overlay */}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                                  <span className="opacity-0 group-hover:opacity-100 text-white bg-black/50 px-2 py-1 rounded text-xs transition-opacity">
+                                    Click to preview
+                                  </span>
+                                </div>
+                                {isDownloaded && (
+                                  <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Info */}
+                              <div className="p-3">
+                                <div className="flex items-start justify-between mb-1">
+                                  <h3 className="font-medium text-gray-900 text-sm">{avatar.name}</h3>
+                                  <span
+                                    className={`px-1.5 py-0.5 text-xs rounded ${
+                                      avatar.gender === "female"
+                                        ? "bg-pink-100 text-pink-700"
+                                        : "bg-blue-100 text-blue-700"
+                                    }`}
+                                  >
+                                    {avatar.gender}
+                                  </span>
+                                </div>
+
+                                <div className="text-xs text-gray-500 mb-2">
+                                  <span>{avatar.size_mb} MB</span>
+                                  <span className="mx-1">•</span>
+                                  <span>{avatar.style}</span>
+                                </div>
+
+                                {isDownloaded ? (
+                                  <span className="block w-full px-3 py-1.5 text-xs text-center bg-green-100 text-green-700 rounded">
+                                    ✓ Downloaded
+                                  </span>
+                                ) : isDownloading ? (
+                                  <div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+                                      <div
+                                        className="bg-blue-500 h-2 rounded-full transition-all animate-pulse"
+                                        style={{ width: `${job?.progress || 10}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs text-blue-600">{job?.message || "Starting..."}</span>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={async () => {
+                                      setDownloadingAvatar(avatar.id);
+                                      setSelectedAvatar(avatar);
+                                      setDownloadName(avatar.name);
+                                      setDownloadGender(avatar.gender === "male" ? "male" : "female");
+
+                                      try {
+                                        const response = await fetch("/api/orchestrator/avatars/download", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            avatar_id: avatar.id,
+                                            name: avatar.name,
+                                            gender: avatar.gender,
+                                            style: avatar.style,
+                                          }),
+                                        });
+
+                                        if (response.ok) {
+                                          const data = await response.json();
+                                          pollDownloadStatus(data.job_id, avatar.id);
+                                        }
+                                      } catch (error) {
+                                        console.error("Failed to start download:", error);
+                                      } finally {
+                                        setDownloadingAvatar(null);
+                                      }
+                                    }}
+                                    className="w-full px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                  >
+                                    ⬇️ Download
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -929,23 +1110,24 @@ export default function AvatarManagerPage() {
         </div>
       )}
 
-      {/* Avatar Preview Modal with Carousel */}
+      {/* Avatar Preview Modal */}
       {showAvatarPreviewModal && previewAvatar && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden relative">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">🎭</span>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Avatar Preview</h2>
-                  <p className="text-sm text-gray-500">Browse and select from available avatars</p>
+                  <p className="text-sm text-gray-500">View avatar details</p>
                 </div>
               </div>
               <button
                 onClick={() => {
                   setShowAvatarPreviewModal(false);
                   setPreviewAvatar(null);
+                  setShowDeleteConfirm(false);
                 }}
                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
               >
@@ -955,99 +1137,73 @@ export default function AvatarManagerPage() {
               </button>
             </div>
 
-            {/* Selected Avatar Display */}
-            <div className="p-6 bg-gray-50 border-b border-gray-200">
-              <div className="flex items-start gap-6">
+            {/* Avatar Display */}
+            <div className="p-6">
+              <div className="flex flex-col items-center">
                 {/* Large Preview Image */}
-                <div className="w-48 h-48 rounded-xl overflow-hidden border-4 border-purple-200 shadow-lg flex-shrink-0">
-                  {catalogAvatars.find(a => a.id === carouselSelectedId)?.thumbnail_url ? (
+                <div className="w-48 h-48 rounded-xl overflow-hidden border-4 border-purple-200 shadow-lg mb-6">
+                  {previewAvatar.thumbnail_url ? (
                     <img
-                      src={catalogAvatars.find(a => a.id === carouselSelectedId)?.thumbnail_url}
-                      alt={catalogAvatars.find(a => a.id === carouselSelectedId)?.name || "Avatar"}
+                      src={previewAvatar.thumbnail_url}
+                      alt={previewAvatar.name || "Avatar"}
                       className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-100 to-pink-100 text-6xl">
-                      {catalogAvatars.find(a => a.id === carouselSelectedId)?.gender === "female" ? "👩" : "👨"}
+                      {previewAvatar.gender === "female" ? "👩" : "👨"}
                     </div>
                   )}
                 </div>
 
                 {/* Avatar Details */}
-                <div className="flex-1">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    {catalogAvatars.find(a => a.id === carouselSelectedId)?.name || "Unknown"}
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                    {previewAvatar.name || "Unknown"}
                   </h3>
-                  <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center justify-center gap-3 mb-4">
                     <span className={`px-3 py-1 text-sm rounded-full ${
-                      catalogAvatars.find(a => a.id === carouselSelectedId)?.gender === "female"
+                      previewAvatar.gender === "female"
                         ? "bg-pink-100 text-pink-700"
                         : "bg-blue-100 text-blue-700"
                     }`}>
-                      {catalogAvatars.find(a => a.id === carouselSelectedId)?.gender === "female" ? "👩 Female" : "👨 Male"}
+                      {previewAvatar.gender === "female" ? "👩 Female" : "👨 Male"}
                     </span>
                     <span className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-full">
-                      {catalogAvatars.find(a => a.id === carouselSelectedId)?.style}
+                      {previewAvatar.style}
                     </span>
                     <span className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-full">
-                      {catalogAvatars.find(a => a.id === carouselSelectedId)?.size_mb} MB
+                      {previewAvatar.size_mb} MB
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mb-4">
                     High-quality LiteAvatar model from ModelScope. Perfect for realistic video generation.
                   </p>
                   <div className="text-xs text-gray-400">
-                    ID: {carouselSelectedId}
+                    ID: {previewAvatar.id}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Carousel Section */}
-            <div className="p-6">
-              <h4 className="text-sm font-medium text-gray-700 mb-4">Select an Avatar</h4>
-              <ImageCarousel
-                items={catalogAvatars
-                  .filter(a => avatarFilter === "all" || a.gender === avatarFilter)
-                  .map(avatar => ({
-                    id: avatar.id,
-                    name: avatar.name,
-                    thumbnailUrl: avatar.thumbnail_url,
-                    gender: avatar.gender === "unknown" ? undefined : avatar.gender,
-                    style: avatar.style,
-                  }))}
-                selectedId={carouselSelectedId}
-                onSelect={(item) => {
-                  setCarouselSelectedId(item.id);
-                  const avatar = catalogAvatars.find(a => a.id === item.id);
-                  if (avatar) {
-                    setPreviewAvatar(avatar);
-                  }
-                }}
-                itemsPerView={5}
-                showNames={true}
-              />
-            </div>
-
             {/* Modal Footer */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
               <div className="flex items-center gap-2">
-                {localAvatars.some(la => la.id === carouselSelectedId) ? (
+                {localAvatars.some(la => la.id === previewAvatar.id) ? (
                   <span className="flex items-center gap-2 text-sm text-green-700 bg-green-100 px-3 py-1.5 rounded-full">
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    Already Downloaded
+                    Downloaded
                   </span>
                 ) : (
                   <span className="text-sm text-gray-500">
-                    This avatar is not yet downloaded
+                    Not downloaded
                   </span>
                 )}
               </div>
               <div className="flex gap-3">
                 {/* Delete button - only show for downloaded avatars */}
-                {localAvatars.some(la => la.id === carouselSelectedId) && (
+                {localAvatars.some(la => la.id === previewAvatar.id) && (
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
                     className="px-4 py-2 text-sm text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2"
@@ -1068,28 +1224,25 @@ export default function AvatarManagerPage() {
                 >
                   Close
                 </button>
-                {!localAvatars.some(la => la.id === carouselSelectedId) && (
+                {!localAvatars.some(la => la.id === previewAvatar.id) && (
                   <button
                     onClick={async () => {
-                      const avatar = catalogAvatars.find(a => a.id === carouselSelectedId);
-                      if (!avatar) return;
-
-                      setDownloadingAvatar(avatar.id);
+                      setDownloadingAvatar(previewAvatar.id);
                       try {
                         const response = await fetch("/api/orchestrator/avatars/download", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
-                            avatar_id: avatar.id,
-                            name: avatar.name,
-                            gender: avatar.gender,
-                            style: avatar.style,
+                            avatar_id: previewAvatar.id,
+                            name: previewAvatar.name,
+                            gender: previewAvatar.gender,
+                            style: previewAvatar.style,
                           }),
                         });
 
                         if (response.ok) {
                           const data = await response.json();
-                          pollDownloadStatus(data.job_id, avatar.id);
+                          pollDownloadStatus(data.job_id, previewAvatar.id);
                           setShowAvatarPreviewModal(false);
                           setPreviewAvatar(null);
                         }
@@ -1104,7 +1257,7 @@ export default function AvatarManagerPage() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Download Avatar
+                    Download
                   </button>
                 )}
               </div>
@@ -1129,24 +1282,24 @@ export default function AvatarManagerPage() {
                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200">
-                        {catalogAvatars.find(a => a.id === carouselSelectedId)?.thumbnail_url ? (
+                        {previewAvatar.thumbnail_url ? (
                           <img
-                            src={catalogAvatars.find(a => a.id === carouselSelectedId)?.thumbnail_url}
+                            src={previewAvatar.thumbnail_url}
                             alt="Avatar"
                             className="w-full h-full object-cover"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-gray-100 text-2xl">
-                            {catalogAvatars.find(a => a.id === carouselSelectedId)?.gender === "female" ? "👩" : "👨"}
+                            {previewAvatar.gender === "female" ? "👩" : "👨"}
                           </div>
                         )}
                       </div>
                       <div>
                         <div className="font-medium text-gray-900">
-                          {catalogAvatars.find(a => a.id === carouselSelectedId)?.name || "Unknown"}
+                          {previewAvatar.name || "Unknown"}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {catalogAvatars.find(a => a.id === carouselSelectedId)?.gender} - {catalogAvatars.find(a => a.id === carouselSelectedId)?.style}
+                          {previewAvatar.gender} - {previewAvatar.style}
                         </div>
                       </div>
                     </div>
