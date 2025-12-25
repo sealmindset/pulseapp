@@ -29,6 +29,31 @@
 - `ui/app/admin/avatars/page.tsx` - Updated delete functionality for all avatar types
 - `ui/app/training/page.tsx` - Fixed user display using `useAuth()` hook
 
+### Log Management & Cribl Integration
+- Added **Log Management** admin page accessible via Admin Dashboard scorecard button
+- Created comprehensive Cribl Stream integration for centralized log management:
+  - **Cribl Configuration Tab**:
+    - Enable/disable integration toggle
+    - Ingest URL configuration (supports Cribl.Cloud ports 20000-20010)
+    - Auth Token (Bearer token authentication)
+    - SSL/TLS verification toggle
+    - Log type filters (System, Application, Behavioral)
+  - **Test Connection**: Validates connectivity to Cribl endpoint before saving
+  - **AI Log Search Tab**: Scaffolded for future AI-powered log search capabilities
+
+- Created logging utility (`ui/lib/logger.ts`) for application-wide use:
+  - Logs to console and forwards to Cribl when configured
+  - Supports three log types: `system`, `application`, `behavioral`
+  - Five log levels: DEBUG, INFO, WARN, ERROR, FATAL
+  - Includes metadata, userId, sessionId, traceId support
+
+### Log Management Files Created
+- `ui/app/admin/logs/page.tsx` - Log Management UI with tabs
+- `ui/app/api/admin/logs/config/route.ts` - Configuration storage API
+- `ui/app/api/admin/logs/test/route.ts` - Connection test endpoint
+- `ui/app/api/admin/logs/forward/route.ts` - Log forwarding API
+- `ui/lib/logger.ts` - Centralized logging utility
+
 ---
 
 ## 2025-12-20 (Session 2)

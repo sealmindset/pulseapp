@@ -46,6 +46,7 @@
 - **AI Components** (`/admin/ai`) - Configure prompts and agents
 - **Training Admin** (`/admin/training`) - Manage training content
 - **Auth & Security** (`/admin/auth`) - User management, roles, SSO
+- **Log Management** (`/admin/logs`) - AI log search and Cribl Stream integration
 
 ### 4. Feedback (`/feedback`)
 - Post-session scoring and analysis
@@ -121,6 +122,12 @@ TRAINING_ORCHESTRATOR_ENABLED=true
 ### Training Page
 - Fixed user info card to show actual logged-in user (was hardcoded "Demo User")
 - Uses `useAuth()` hook to get user name and compute initials
+
+### Log Management & Cribl Integration
+- Added Log Management admin page with Cribl Stream configuration
+- Created logging utility (`/ui/lib/logger.ts`) for application-wide use
+- Supports system, application, and behavioral log types
+- Test Connection feature for validating Cribl configuration
 
 ## Common Development Tasks
 
@@ -200,6 +207,21 @@ const response = await fetch(`${FUNCTION_APP_BASE_URL}/endpoint`, {
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(data),
 });
+```
+
+### Using the Logger
+```typescript
+import { logger } from '@/lib/logger';
+
+// Application logs
+logger.info('User logged in', { userId: '123', source: 'auth' });
+logger.error('Failed to load data', { error: err.message });
+
+// Behavioral logs (training metrics)
+logger.behavioral('Training session completed', { userId: '123', score: 85 });
+
+// System logs
+logger.infoSystem('Server started', { source: 'startup' });
 ```
 
 ## Known Issues / Technical Debt
