@@ -522,3 +522,254 @@ This implementation provides:
 - ✅ No hydration mismatches
 - ✅ shadcn/ui component patterns
 - ✅ Tailwind CSS v4 compatible
+
+---
+
+## Lessons Learned
+
+### 1. Simpler Toggle Alternative
+
+If the dropdown menu approach causes issues (e.g., with Tailwind v4 animation classes or Radix UI compatibility), a simpler single-button toggle works reliably:
+
+```typescript
+"use client"
+
+import * as React from "react"
+import { Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
+import { Button } from "@/components/ui/button"
+
+export function ModeToggle() {
+    const [mounted, setMounted] = React.useState(false)
+    const { theme, setTheme } = useTheme()
+
+    React.useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    if (!mounted) {
+        return (
+            <Button variant="outline" size="icon" disabled>
+                <Sun className="h-[1.2rem] w-[1.2rem]" />
+                <span className="sr-only">Toggle theme</span>
+            </Button>
+        )
+    }
+
+    const toggleTheme = () => {
+        const newTheme = theme === "dark" ? "light" : "dark"
+        setTheme(newTheme)
+    }
+
+    return (
+        <Button variant="outline" size="icon" onClick={toggleTheme}>
+            <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+        </Button>
+    )
+}
+```
+
+**Key differences:**
+- Uses `mounted` state to prevent hydration mismatch
+- Direct toggle between light/dark (no system option, but simpler)
+- No dropdown dependency - fewer potential points of failure
+
+### 2. Tailwind v3 vs v4 Compatibility
+
+The dropdown-menu component may use Tailwind v4 syntax that isn't compatible with v3:
+
+| Tailwind v4 Syntax | Tailwind v3 Equivalent |
+|--------------------|------------------------|
+| `outline-hidden` | `outline-none` |
+| `max-h-(--radix-var)` | Remove or use fixed value |
+| `origin-(--radix-var)` | Remove or use `origin-top` |
+
+If using Tailwind v3, simplify the dropdown-menu component:
+
+```typescript
+<DropdownMenuPrimitive.Content
+  className={cn(
+    "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+    className
+  )}
+  {...props}
+/>
+```
+
+### 3. tailwindcss-animate Plugin Issues
+
+The `tailwindcss-animate` plugin may cause build errors with certain Tailwind versions. If you encounter errors like:
+
+```
+Cannot apply unknown utility class: animate-in
+```
+
+**Solutions:**
+1. Remove animation classes from components
+2. Or ensure `tailwindcss-animate` is properly installed and configured in `tailwind.config.ts`
+
+### 4. Hex Colors vs OKLCH
+
+For broader browser compatibility, use hex colors instead of OKLCH:
+
+```css
+:root {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #171717;
+  --primary-foreground: #fafafa;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f5f5f5;
+  --accent-foreground: #171717;
+  --destructive: #ef4444;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #a3a3a3;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #171717;
+  --card-foreground: #fafafa;
+  --popover: #171717;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #171717;
+  --secondary: #262626;
+  --secondary-foreground: #fafafa;
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+  --accent: #262626;
+  --accent-foreground: #fafafa;
+  --destructive: #dc2626;
+  --border: #262626;
+  --input: #262626;
+  --ring: #d4d4d4;
+}
+```
+
+### 5. Dark Mode Overrides for Hardcoded Colors
+
+When existing components use hardcoded Tailwind color classes (like `bg-white`, `text-gray-900`, `bg-blue-50`), add global CSS overrides instead of modifying each component:
+
+```css
+/* Dark mode overrides for hardcoded colors */
+
+/* Backgrounds */
+.dark .bg-white {
+  background-color: var(--card) !important;
+}
+
+.dark .bg-gray-50,
+.dark .bg-gray-100 {
+  background-color: var(--secondary) !important;
+}
+
+.dark .bg-gray-200 {
+  background-color: var(--muted) !important;
+}
+
+/* Text colors */
+.dark .text-gray-900 {
+  color: var(--foreground) !important;
+}
+
+.dark .text-gray-800,
+.dark .text-gray-700 {
+  color: var(--foreground) !important;
+}
+
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: var(--muted-foreground) !important;
+}
+
+/* Borders */
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 {
+  border-color: var(--border) !important;
+}
+
+/* Hover states */
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover {
+  background-color: var(--accent) !important;
+}
+
+/* Colored backgrounds - use semi-transparent versions */
+.dark .bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+}
+.dark .bg-green-50 {
+  background-color: rgba(34, 197, 94, 0.15) !important;
+}
+.dark .bg-yellow-50 {
+  background-color: rgba(234, 179, 8, 0.15) !important;
+}
+.dark .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+/* Colored text - use lighter variants */
+.dark .text-blue-700,
+.dark .text-blue-600 {
+  color: #60a5fa !important;
+}
+.dark .text-green-700,
+.dark .text-green-600 {
+  color: #4ade80 !important;
+}
+.dark .text-red-700,
+.dark .text-red-600 {
+  color: #f87171 !important;
+}
+
+/* Form inputs */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: var(--secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+
+/* Invert black buttons for dark mode */
+.dark .bg-black {
+  background-color: #fafafa !important;
+  color: #0a0a0a !important;
+}
+```
+
+**Benefits of this approach:**
+- No need to modify individual component files
+- Centralized dark mode styling
+- Easy to maintain and extend
+- Works with third-party components using hardcoded colors
+
+### 6. CSS Variable Opacity Syntax
+
+The Tailwind opacity syntax with CSS variables doesn't work with `!important`:
+
+```css
+/* This FAILS */
+.dark .text-something {
+  @apply !text-foreground/90;  /* Error: class does not exist */
+}
+
+/* Use direct CSS instead */
+.dark .text-something {
+  color: var(--foreground) !important;
+}
+```
