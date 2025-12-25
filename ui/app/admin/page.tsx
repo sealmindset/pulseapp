@@ -12,7 +12,7 @@ export default function AdminPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Admin Dashboard</h1>
       </div>
-      <div className={`rounded border p-2 text-sm ${enable ? "border-yellow-200 bg-yellow-50 text-yellow-800" : "border-gray-200 bg-gray-50 text-gray-700"}`}>{banner}</div>
+      <div className={`rounded border p-2 text-sm ${enable ? "border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200" : "border-border bg-muted text-muted-foreground"}`}>{banner}</div>
       
       {enable ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -277,7 +277,7 @@ export default function AdminPage() {
           </Link>
         </div>
       ) : (
-        <div className="text-sm text-gray-600">Set NEXT_PUBLIC_ENABLE_ADMIN=true and NEXT_PUBLIC_ENV_NAME!=prod to enable in dev.</div>
+        <div className="text-sm text-muted-foreground">Set NEXT_PUBLIC_ENABLE_ADMIN=true and NEXT_PUBLIC_ENV_NAME!=prod to enable in dev.</div>
       )}
     </div>
   );
