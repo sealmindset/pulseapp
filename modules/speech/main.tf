@@ -12,7 +12,7 @@ resource "azurerm_cognitive_account" "speech" {
   kind     = "SpeechServices"
   sku_name = var.speech_sku_name
 
-  public_network_access_enabled = false
+  public_network_access_enabled = true
 
   tags = merge(var.common_tags, {
     service_role = "speech-avatar"

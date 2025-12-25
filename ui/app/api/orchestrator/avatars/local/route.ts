@@ -2,9 +2,13 @@
 // Local Avatars API - Manages downloaded avatars
 // =============================================================================
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors";
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/lib/rate-limiter";
+import { handleApiError } from "@/lib/errors";
+import { auditLog, getAuditIp } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -43,13 +47,27 @@ function loadMetadata(): AvatarMetadata {
   return { avatars: {} };
 }
 
-function saveMetadata(metadata: AvatarMetadata) {
-  ensureDataDir();
-  fs.writeFileSync(METADATA_FILE, JSON.stringify(metadata, null, 2));
+export async function OPTIONS(req: NextRequest) {
+  return corsOptionsResponse(req);
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const ip = getAuditIp(req);
+
   try {
+    // Rate limiting
+    const clientId = getClientId(req);
+    const { allowed } = checkRateLimit(clientId, 'default');
+    if (!allowed) {
+      auditLog.rateLimited(clientId, 'avatars/local', ip);
+      const response = rateLimitResponse();
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+      });
+    }
+
     const metadata = loadMetadata();
 
     const avatars = Object.entries(metadata.avatars).map(([id, data]) => ({
@@ -62,12 +80,15 @@ export async function GET() {
       avatars,
       total: avatars.length,
       data_dir: DATA_DIR,
+    }, {
+      headers: getCorsHeaders(origin),
     });
   } catch (error) {
-    console.error("Failed to fetch local avatars:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch local avatars" },
-      { status: 500 }
-    );
+    auditLog.error('api/orchestrator/avatars/local', error, ip);
+    const response = handleApiError(error, 'api/orchestrator/avatars/local');
+    return new Response(response.body, {
+      status: response.status,
+      headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+    });
   }
 }

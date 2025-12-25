@@ -8,6 +8,20 @@ prod.tfvars
 *.tfvars
 !*.tfvars.example
 
+# Security - credentials and secrets
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials.json
+secrets.json
+**/secrets/
+.secrets
+*.secrets
+local.settings.json
+!local.settings.json.example
+
 **/node_modules/
 **/logs
 **/*.log

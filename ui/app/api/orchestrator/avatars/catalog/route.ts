@@ -5,6 +5,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { requireAdmin } from "@/lib/auth-utils";
+import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors";
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/lib/rate-limiter";
+import { handleApiError } from "@/lib/errors";
+import { auditLog, getAuditIp } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -74,8 +79,27 @@ const AVATAR_CATALOG = [
 
 const BASE_URL = "https://modelscope.cn/models/HumanAIGC-Engineering/LiteAvatarGallery/resolve/master";
 
-export async function GET() {
+export async function OPTIONS(req: NextRequest) {
+  return corsOptionsResponse(req);
+}
+
+export async function GET(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const ip = getAuditIp(req);
+
   try {
+    // Rate limiting
+    const clientId = getClientId(req);
+    const { allowed } = checkRateLimit(clientId, 'default');
+    if (!allowed) {
+      auditLog.rateLimited(clientId, 'avatars/catalog', ip);
+      const response = rateLimitResponse();
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+      });
+    }
+
     // Load hidden avatars list
     const hiddenData = loadHiddenAvatars();
 
@@ -105,26 +129,53 @@ export async function GET() {
       avatars,
       total: avatars.length,
       hidden_count: hiddenData.hidden.length,
+    }, {
+      headers: getCorsHeaders(origin),
     });
   } catch (error) {
-    console.error("Failed to fetch avatar catalog:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch avatar catalog" },
-      { status: 500 }
-    );
+    auditLog.error('api/orchestrator/avatars/catalog', error, ip);
+    const response = handleApiError(error, 'api/orchestrator/avatars/catalog');
+    return new Response(response.body, {
+      status: response.status,
+      headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+    });
   }
 }
 
-// DELETE - Hide/remove an avatar from the catalog
-export async function DELETE(request: NextRequest) {
+// DELETE - Hide/remove an avatar from the catalog (admin only)
+export async function DELETE(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const ip = getAuditIp(req);
+
   try {
-    const { searchParams } = new URL(request.url);
+    // Require admin authentication for deletion
+    const authResult = await requireAdmin();
+    if (authResult.error) {
+      return new Response(authResult.error.body, {
+        status: 403,
+        headers: { "Content-Type": "application/json", ...getCorsHeaders(origin) },
+      });
+    }
+
+    // Rate limiting
+    const clientId = getClientId(req, authResult.session.user.userId);
+    const { allowed } = checkRateLimit(clientId, 'default');
+    if (!allowed) {
+      auditLog.rateLimited(clientId, 'avatars/catalog', ip);
+      const response = rateLimitResponse();
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+      });
+    }
+
+    const { searchParams } = new URL(req.url);
     const avatarId = searchParams.get("id");
 
     if (!avatarId) {
       return NextResponse.json(
         { error: "Avatar ID is required" },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(origin) }
       );
     }
 
@@ -133,7 +184,7 @@ export async function DELETE(request: NextRequest) {
     if (!avatar) {
       return NextResponse.json(
         { error: "Avatar not found in catalog" },
-        { status: 404 }
+        { status: 404, headers: getCorsHeaders(origin) }
       );
     }
 
@@ -143,24 +194,34 @@ export async function DELETE(request: NextRequest) {
     if (hiddenData.hidden.includes(avatarId)) {
       return NextResponse.json(
         { error: "Avatar is already hidden" },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(origin) }
       );
     }
 
     hiddenData.hidden.push(avatarId);
     saveHiddenAvatars(hiddenData);
 
+    // Log admin action
+    auditLog.adminAction(
+      authResult.session.user.userId || authResult.session.user.id || 'unknown',
+      `hide_avatar:${avatarId}`,
+      ip
+    );
+
     return NextResponse.json({
       success: true,
       message: `Avatar "${avatar.name}" removed from catalog`,
       hidden_id: avatarId,
       hidden_count: hiddenData.hidden.length,
+    }, {
+      headers: getCorsHeaders(origin),
     });
   } catch (error) {
-    console.error("Failed to hide avatar:", error);
-    return NextResponse.json(
-      { error: "Failed to remove avatar from catalog" },
-      { status: 500 }
-    );
+    auditLog.error('api/orchestrator/avatars/catalog', error, ip);
+    const response = handleApiError(error, 'api/orchestrator/avatars/catalog');
+    return new Response(response.body, {
+      status: response.status,
+      headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+    });
   }
 }

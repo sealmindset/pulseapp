@@ -1,87 +1,439 @@
-Yes, the proposed AI sales training app is highly capable of fully implementing vocalization, which is essential for creating the requested immersive and interactive training environment. This capability is enabled by specific **Azure OpenAI audio models** that support real-time conversational interaction.
+# PULSE Platform Capabilities
 
-### 1. Enabling Vocalization with Azure OpenAI Models
+This document provides a comprehensive overview of all capabilities implemented in the PULSE Behavioral Certification Platform.
 
-The platform provides dedicated audio models necessary for converting trainee speech into text for analysis (Speech-to-Text) and generating realistic, persona-driven responses (Text-to-Speech).
+---
 
-*   **Real-Time Conversational Models:** The sources explicitly detail **GPT-4o audio models** that support **"low-latency, *speech in, speech out* conversational interactions"**. Specific models like `gpt-4o-realtime-preview` are designed for **"real-time audio processing"**.
-*   **Speech-to-Text (Trainee Input):** The Azure OpenAI `/audio` API includes models such as **`whisper`** and **`gpt-4o-transcribe`** for high-quality **"speech-to-text"** conversion, which allows the Agentic AI system to process and evaluate the trainee's verbal performance accurately.
-*   **Text-to-Speech (AI Persona Output):** The `/audio` API also supports **Text-to-Speech models** (like `tts` and `tts-hd` optimized for quality). This capability is critical for allowing the AI personas (Director, Relater, Socializer, Thinker) to speak their scripted and adaptive responses, including guidance on how to **"guide the voice to speak in a specific style or tone"**.
+## 1. Core Vocalization and Audio Capabilities
 
-### 2. Supporting PULSE Behavioral Training
+The platform provides full vocalization support essential for creating immersive and interactive sales training environments. This capability is enabled by **Azure OpenAI audio models** that support real-time conversational interaction.
 
-Vocalization is vital because the training emphasizes verbal communication and specific linguistic tactics that must be practiced out loud for high mastery (H4):
+### 1.1 Azure OpenAI Audio Models
 
-*   **Practicing Proprietary Language:** The app must allow trainees to practice **"mini-talks"** (concise product feature explanations) and specific frameworks like **CECAP** (Compliment, Empathy, Can Do, Ask, Positivity) and **LERA** (Listen, Empathize, Reaffirm, Add Relevant Information) in real-time conversation.
-*   **Immersive Experience:** The initial training materials themselves contain **"Storyline course"** and **"Example Video(s)"**, indicating that audio and visual delivery are already key components of instruction and practice. Other modules contain notes requiring audio clips to be recorded for specific pronunciations (e.g., "lyocell," "percale," "Supima"), confirming the importance of vocal delivery and comprehension.
-*   **Behavioral Adaptation:** The AI personas, based on the **Platinum Rule**, require the trainee to adapt their own vocal style (e.g., pace and tone) in response to the AI customer's style (e.g., the Thinker persona uses a **"Monotone, Calm, Measured voice"**). Vocalization is the only way to accurately train and evaluate this required **Behavioral Certification** skill.
+*   **Real-Time Conversational Models:** The platform leverages **GPT-4o audio models** supporting **"low-latency, speech in, speech out conversational interactions"**. Specific models like `gpt-4o-realtime-preview` enable real-time audio processing.
+*   **Speech-to-Text (Trainee Input):** Models including **`whisper`** and **`gpt-4o-transcribe`** provide high-quality speech-to-text conversion, enabling the Agentic AI system to process and evaluate trainee verbal performance.
+*   **Text-to-Speech (AI Persona Output):** Models like `tts` and `tts-hd` generate realistic, persona-driven spoken responses with configurable voice styles and tones.
 
-### 3. Implementation in the PULSE Behavioral Certification Platform
+### 1.2 PULSE Behavioral Training Support
 
-The current PULSE infrastructure and app implementation realize these capabilities as follows:
+Vocalization enables training on verbal communication tactics required for H4 (High Mastery):
 
-*   **Dedicated audio deployment (`PULSE-Audio-Realtime`):** Terraform provisions an Azure OpenAI deployment dedicated to real-time audio (`PULSE-Audio-Realtime`), alongside chat/reasoning and visual asset deployments. The Web App and Function App receive the deployment name via app settings (e.g., `OPENAI_DEPLOYMENT_PULSE_AUDIO_REALTIME`).
-*   **Function App orchestration for audio:** The orchestrator Function App exposes endpoints such as `/audio/chunk` that accept microphone audio from the UI, call the configured Azure OpenAI audio model over a private endpoint, and return partial transcripts and/or audio responses. This aligns with the GPT-4o-style "speech in, speech out" interaction pattern described by the sources.
-*   **Next.js UI XHR audio flow:** The Session page in the Next.js UI uses MediaRecorder to capture short audio chunks and POSTs them via XHR to `/api/orchestrator/audio/chunk`, which forwards to the Function App. The UI then immediately plays back returned audio (`audio/*`, `ttsUrl`, or `audioBase64`) and appends partial transcripts, enabling fully interactive, persona-driven practice.
-*   **End-to-end private networking:** Azure OpenAI and Storage are reachable only via Private Endpoints and Private DNS; the browser never calls Azure OpenAI directly. All STT/TTS and behavior evaluation flows run through the VNet-integrated Function App, which enforces the RESTRICTED IP and behavioral certification requirements.
+*   **Proprietary Language Practice:** Trainees practice "mini-talks" (concise product explanations) and frameworks like **CECAP** (Compliment, Empathy, Can Do, Ask, Positivity) and **LERA** (Listen, Empathize, Reaffirm, Add Relevant Information).
+*   **Behavioral Adaptation:** AI personas based on the **Platinum Rule** require trainees to adapt vocal style (pace, tone) to match customer personality types (Director uses assertive tone; Thinker uses monotone, calm, measured voice).
+*   **Pronunciation Training:** Audio clips for specific terminology (e.g., "lyocell," "percale," "Supima") ensure correct vocal delivery.
 
-In summary, the inclusion of **Azure OpenAI real-time audio models** (conceptually aligned with `gpt-4o` audio capabilities) is reflected in the Terraform configuration and application code as a dedicated audio deployment (`PULSE-Audio-Realtime`) wired through the Function App and Next.js UI. Together, these components deliver the fully vocalized, immersive role-playing experience required for certifying **Mastery-Level Sales Talent (H4)**.
+### 1.3 Complete Audio Processing Pipeline
 
-### 3.1 Dynamic Avatar Video Generation (Sora-2)
+The orchestrator implements a full end-to-end audio processing pipeline:
 
-Beyond static persona images, the platform now supports **dynamic lip-synced avatar videos** using Azure OpenAI's Sora-2 model, creating a more immersive and realistic training experience.
+1. **Speech-to-Text (STT):** User audio captured via MediaRecorder is transcribed using `gpt-4o-realtime-preview`
+2. **Conversational AI:** Transcripts processed by chat models with persona-aware prompting
+3. **Text-to-Speech (TTS):** AI responses synthesized into natural speech
+4. **Avatar Video:** Lip-synced video clips generated when available
+5. **Conversation Persistence:** All exchanges stored in blob storage for evaluation
 
-*   **Video vs Static Images:** The platform has migrated from DALL-E-3 (static image generation) to Sora-2 (video generation). This enables the AI customer persona to appear as a talking head video that synchronizes with the TTS audio output, rather than a static photograph.
-*   **Persona-Specific Avatars:** Each Platinum Rule persona (Director, Relater, Socializer, Thinker) has a distinct visual configuration:
+---
+
+## 2. Avatar and Visual Systems
+
+### 2.1 Dynamic Avatar Video Generation (Sora-2)
+
+The platform supports **dynamic lip-synced avatar videos** using Azure OpenAI's Sora-2 model:
+
+*   **Video vs Static Images:** Migrated from DALL-E-3 (static) to Sora-2 (video) for talking head avatars synchronized with TTS audio
+*   **Persona-Specific Avatars:** Each Platinum Rule persona has distinct visual configuration:
     - **Director:** Professional business executive, formal attire, assertive demeanor
     - **Relater:** Warm friendly person, smart casual, patient and empathetic
     - **Socializer:** Energetic expressive person, trendy casual, enthusiastic
     - **Thinker:** Thoughtful analytical person, neat professional, methodical
-*   **Emotion-Aware Expressions:** The avatar service maps response content to appropriate facial expressions (neutral, interested, skeptical, pleased, concerned, excited, hesitant), making the AI persona's reactions contextually appropriate.
-*   **Graceful Degradation:** When Sora-2 is unavailable (pending quota approval), the system falls back to static images or placeholder displays without breaking the training flow.
+*   **Emotion-Aware Expressions:** Avatar maps response content to facial expressions (neutral, interested, skeptical, pleased, concerned, excited, hesitant)
+*   **Graceful Degradation:** Falls back to static images when Sora-2 unavailable
 
-### 3.2 Complete Audio Processing Pipeline
+### 2.2 Avatar Manager Component
 
-The orchestrator now implements a full end-to-end audio processing pipeline:
+Located in `ui/components/avatar-manager.tsx`, the Avatar Manager provides:
 
-1. **Speech-to-Text (STT):** User audio captured via MediaRecorder is transcribed using `gpt-4o-realtime-preview`.
-2. **Conversational AI:** The transcript is processed by `gpt-5-chat` with persona-aware prompting to generate contextually appropriate customer responses.
-3. **Text-to-Speech (TTS):** The AI response is synthesized into natural speech audio using `gpt-4o-realtime-preview`.
-4. **Avatar Video:** When Sora-2 is available, a lip-synced video clip is generated to accompany the audio response.
-5. **Conversation Persistence:** All exchanges are stored in blob storage for later evaluation by BCE/MCF/CPO agents.
+*   **ModelScope Integration:** Local TTS avatar generation using ModelScope models
+*   **Piper TTS Support:** Lightweight neural text-to-speech with voice model selection
+*   **Azure Speech Avatar Service:** Production avatar service integration via `AZURE_SPEECH_REGION` and `AZURE_SPEECH_KEY`
+*   **Multi-Provider Architecture:** Automatic provider selection based on availability and configuration
 
-This pipeline enables truly interactive, voice-driven training sessions where trainees practice verbal communication skills in real-time with an AI customer that both speaks and visually responds.
+### 2.3 Scenario Configuration System
 
-### 4. PULSE Trainer Agent (Dev Preview)
+Scenarios configured in `ui/lib/scenarios/scenarioConfig.ts` define:
 
-On top of the audio and chat capabilities, the platform includes an experimental **PULSE Trainer Agent** that provides step-focused coaching for the PULSE Selling framework in a dedicated Training Mode flow.
+*   Persona type assignment (Director, Relater, Socializer, Thinker)
+*   Voice selection and behavioral parameters
+*   Customer background and conversation context
+*   Evaluation rubric and mastery thresholds
 
-- **Training flow:** The Next.js UI exposes a `/training` page that calls a backend trainer endpoint (`POST /trainer/pulse/step`) via the orchestrator Function App. The UI sends structured `CONFIG` and `SESSION` JSON describing the current PULSE step, scenario rubric, and learner answer.
-- **Adaptive vs static behavior:** The trainer uses Azure OpenAI chat models (via the Function App) to:
-  - Diagnose strengths and weaknesses for the active PULSE step.
-  - Ask targeted follow-up questions when adaptive training is enabled.
-  - Estimate step-level mastery and optionally emit self-annealing `trainer_change_log` suggestions for rubric/prompt improvements.
-- **Environment gating:** Training is explicitly gated so it can be piloted safely in non-production environments:
-  - UI visibility requires `NEXT_PUBLIC_ENABLE_TRAINING=true` and `NEXT_PUBLIC_ENV_NAME!=prod`.
-  - Backend LLM calls require `PULSE_TRAINER_ENABLED=true`; when disabled, the trainer returns a static-evaluation JSON payload and never calls Azure OpenAI.
+---
 
-All trainer interactions continue to respect the same private networking guarantees: the browser never talks to Azure OpenAI directly and all requests flow through the VNet-integrated Function App.
+## 3. Authentication and Identity Management
 
-### 5. PULSE Evaluator and Coaching Capabilities
+### 3.1 OIDC/SSO Integration with Azure AD
 
-Beyond real-time coaching, the platform defines a **PULSE Evaluator/Coach** responsible for scoring completed conversations and providing structured coaching feedback.
+The platform implements enterprise-grade authentication:
 
-- **PULSE 0–3 scoring:** The evaluator uses the five-step PULSE Selling framework (Probe, Understand, Link, Simplify, Earn) and assigns a **0–3 score per step**, where 0 = not demonstrated, 1 = weak, 2 = solid, 3 = strong.
-- **Structured JSON output:** The evaluator returns a consistent JSON object with:
-  - `framework: "PULSE"`.
-  - `scores` for each PULSE step, each containing `score`, a short textual `reason`, and 1–2 concrete `tips`.
-  - An `overall_summary` section capturing strengths and top improvement opportunities.
-- **Prompt definition:** The canonical system prompt and JSON contract for this evaluator live in `docs/pulseagent.md` and are managed as a versioned system prompt (`pulse-evaluator-v1`) via the Admin Prompts UI. Future `/feedback/{sessionId}` implementations can load this prompt and produce standardized PULSE 0–3 evaluations over stored transcripts.
+*   **NextAuth.js Integration:** Full OIDC flow with Azure AD provider
+*   **Configuration Variables:**
+    - `AUTH_MODE`: Toggle between SSO and bypass modes
+    - `AZURE_AD_CLIENT_ID`, `AZURE_AD_CLIENT_SECRET`, `AZURE_AD_TENANT_ID`
+    - `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
+*   **Token Management:** Secure session handling with JWT tokens
+*   **Middleware Protection:** Route protection via `middleware.ts` for authenticated paths
 
-### 6. Admin Prompt Editing and Self-Annealing
+### 3.2 Five-Tier RBAC System
 
-The platform includes tooling to evolve prompts and rubrics safely over time while preserving RESTRICTED IP controls.
+Implemented in `ui/lib/rbac.ts`, the Role-Based Access Control system defines:
 
-- **Admin Prompt Editor (dev mode):** A gated `/admin` experience (enabled only in non-production environments) allows operators to create, view, and version prompts and agent definitions. Prompt content is persisted to a private Azure Blob container with per-version snapshots.
-- **Trainer self-annealing logs:** When configured, the PULSE Trainer can emit `trainer_change_log` entries into the same private storage, capturing observed patterns and proposed rubric or prompt adjustments. These logs act as a feedback channel for human prompt owners to refine training content without impacting live request latency.
-- **Separation of concerns:** Client logs avoid exposing identifiers or sensitive content; all prompt storage, versioning, and self-annealing artifacts remain server-side behind private networking and storage.
+| Role | Capabilities |
+|------|-------------|
+| **super_admin** | Full system access, user management, settings configuration |
+| **admin** | Organization management, user invitations, reports access |
+| **manager** | Team oversight, trainee progress tracking, analytics |
+| **trainer** | Content delivery, session facilitation, feedback provision |
+| **trainee** | Training participation, self-assessment, progress viewing |
+
+### 3.3 User Management System
+
+Located in `ui/app/admin/users/`:
+
+*   **User Directory:** Paginated list with search and role filtering
+*   **Role Assignment:** Dropdown selection with immediate save
+*   **User Status:** Active/inactive toggle with visual indicators
+*   **Audit Trail:** Last login tracking and activity monitoring
+
+### 3.4 User Invitation System
+
+Two invitation methods implemented:
+
+*   **Email Invitations:** Direct email with secure invitation link and role pre-assignment
+*   **Shareable Links:** Generated links with configurable expiration and usage limits
+*   **Domain Auto-Provisioning Rules:** Automatic role assignment based on email domain patterns
+
+---
+
+## 4. Training Administration
+
+### 4.1 Training Admin Dashboard
+
+Located at `ui/app/admin/training/page.tsx`, the dashboard provides four tabs:
+
+| Tab | Description |
+|-----|-------------|
+| **Modules** | Training module management, ordering, and activation |
+| **Levels** | Certification level configuration and prerequisites |
+| **Settings** | Global training parameters and thresholds |
+| **Analytics** | Training metrics and completion statistics |
+
+### 4.2 Admin Prompt Editor
+
+Gated to non-production environments (`NEXT_PUBLIC_ENABLE_ADMIN=true`):
+
+*   **Prompt Versioning:** Per-version snapshots with rollback capability
+*   **System Prompt Management:** Create, view, edit versioned prompts
+*   **Agent Definitions:** Configure AI agent behaviors and parameters
+*   **Storage:** Private Azure Blob container with version history
+
+### 4.3 Trainer Self-Annealing
+
+When configured, the PULSE Trainer emits `trainer_change_log` entries:
+
+*   Captures observed patterns and proposed rubric adjustments
+*   Feedback channel for human prompt refinement
+*   Server-side storage behind private networking
+
+---
+
+## 5. PULSE Framework Agents
+
+### 5.1 PULSE Trainer Agent
+
+Provides step-focused coaching for the PULSE Selling framework:
+
+*   **Training Flow:** `/training` page calls backend trainer endpoint (`POST /trainer/pulse/step`)
+*   **Structured Input:** CONFIG and SESSION JSON with PULSE step, scenario rubric, learner answer
+*   **Adaptive Behavior:**
+    - Diagnose strengths/weaknesses per PULSE step
+    - Ask targeted follow-up questions when adaptive training enabled
+    - Estimate step-level mastery
+*   **Environment Gating:**
+    - UI: `NEXT_PUBLIC_ENABLE_TRAINING=true` and `NEXT_PUBLIC_ENV_NAME!=prod`
+    - Backend: `PULSE_TRAINER_ENABLED=true`
+
+### 5.2 PULSE Evaluator/Coach
+
+Scores completed conversations and provides structured feedback:
+
+*   **PULSE 0-3 Scoring:** Five-step framework (Probe, Understand, Link, Simplify, Earn)
+    - 0 = not demonstrated
+    - 1 = weak
+    - 2 = solid
+    - 3 = strong
+*   **Structured JSON Output:**
+    - `framework: "PULSE"`
+    - `scores` per step with `score`, `reason`, and `tips`
+    - `overall_summary` with strengths and improvement opportunities
+*   **Prompt Definition:** Canonical prompt in `docs/pulseagent.md`, managed as `pulse-evaluator-v1`
+
+### 5.3 BCE/MCF/CPO Evaluation Agents
+
+Specialized evaluation agents for different competency dimensions:
+
+*   **BCE (Behavioral Certification Evaluator):** Assesses behavioral adaptation
+*   **MCF (Mastery Certification Framework):** Measures skill progression
+*   **CPO (Customer Persona Optimization):** Evaluates persona handling
+
+---
+
+## 6. Session and Feedback System
+
+### 6.1 Pre-Session Configuration
+
+Located at `ui/app/pre-session/page.tsx`:
+
+*   **Scenario Selection:** Choose training scenario and persona type
+*   **User ID Tagging:** Optional pilot user ID for analytics (`NEXT_PUBLIC_PULSE_READINESS_USER_ID`)
+*   **Session Parameters:** Configure duration, difficulty, and focus areas
+
+### 6.2 Live Session Page
+
+The core training experience at `ui/app/session/`:
+
+*   **Real-Time Audio:** MediaRecorder capture with chunked upload
+*   **Avatar Display:** Visual feedback from AI persona
+*   **Transcript View:** Live conversation display
+*   **Session Controls:** Start, pause, end session actions
+*   **Persistence:** Automatic save to blob storage
+
+### 6.3 Multi-Tab Feedback Page
+
+Located at `ui/app/feedback/page.tsx` with multiple analysis views:
+
+| Tab | Content |
+|-----|---------|
+| **Summary** | Overall session performance overview |
+| **PULSE Analysis** | Step-by-step PULSE framework scoring |
+| **AI Coach** | Personalized improvement recommendations |
+| **Transcript** | Full conversation with annotations |
+| **Readiness** | Longitudinal skill readiness assessment |
+
+### 6.4 Readiness Service Integration
+
+API routes in `ui/app/api/orchestrator/readiness/`:
+
+*   **User Readiness:** `GET /readiness/{userId}` - Overall readiness score
+*   **Skill Breakdown:** `GET /readiness/{userId}/skills` - Per-skill readiness metrics
+*   **Longitudinal Tracking:** Historical score progression
+*   **Conditional Display:** Shown only when `NEXT_PUBLIC_PULSE_READINESS_USER_ID` configured
+
+---
+
+## 7. Analytics and Logging
+
+### 7.1 PostgreSQL Analytics Database
+
+Provisioned via `modules/analytics_postgres/`:
+
+*   **Server:** Azure PostgreSQL Flexible Server (`pg-PULSE-analytics-{env}`)
+*   **Database:** `pulse_analytics` with UTF8 encoding
+*   **Networking:** Private subnet with delegated PostgreSQL access
+*   **Private DNS:** `privatelink.postgres.database.azure.com` resolution
+*   **Connectivity:** App settings provide `PULSE_ANALYTICS_DB_*` credentials
+
+### 7.2 Application Insights Integration
+
+*   **Connection String:** Provided via `APPLICATIONINSIGHTS_CONNECTION_STRING`
+*   **Telemetry:** Request tracing, exception logging, performance metrics
+*   **Dashboard:** Azure portal monitoring and alerting
+
+### 7.3 Log Management (Cribl Integration)
+
+Admin log management at `ui/app/admin/logs/`:
+
+*   **Ingest Configuration:** Configurable log ingest URL
+*   **Connection Testing:** `POST /api/admin/logs/test` endpoint
+*   **Timeout Handling:** Connection timeout detection with user-friendly messaging
+
+### 7.4 Admin Dashboard Overview
+
+Main admin dashboard at `ui/app/admin/`:
+
+*   **System Metrics:** Active users, session counts, completion rates
+*   **Quick Actions:** Navigation to sub-admin features
+*   **Status Indicators:** Service health and connectivity status
+
+---
+
+## 8. User Interface Capabilities
+
+### 8.1 Dark/Light Mode Theme Toggle
+
+Implemented in `ui/components/mode-toggle.tsx`:
+
+*   **Theme Provider:** Next-themes integration for system-wide theming
+*   **Toggle Component:** Dropdown menu with Light, Dark, and System options
+*   **Persistence:** Theme preference stored in localStorage
+*   **System Detection:** Automatic detection of OS preference when set to "System"
+*   **Smooth Transitions:** CSS transitions for theme switching
+
+### 8.2 Dropdown Menu Component
+
+Located at `ui/components/ui/dropdown-menu.tsx`:
+
+*   **Radix UI Foundation:** Built on @radix-ui/react-dropdown-menu
+*   **Accessibility:** Full keyboard navigation and screen reader support
+*   **Sub-menus:** Nested menu support with chevron indicators
+*   **Checkboxes/Radio:** Selection state management
+*   **Animation:** Smooth enter/exit animations
+
+### 8.3 Component Library
+
+Comprehensive UI components in `ui/components/ui/`:
+
+*   **Forms:** Input, Select, Checkbox, Radio, Switch, Textarea
+*   **Feedback:** Alert, Toast, Progress, Skeleton loaders
+*   **Navigation:** Tabs, Breadcrumbs, Pagination
+*   **Overlays:** Dialog, Drawer, Popover, Tooltip
+*   **Data Display:** Table, Card, Badge, Avatar
+
+---
+
+## 9. Infrastructure and Networking
+
+### 9.1 Private Endpoint Architecture
+
+All sensitive services use private endpoints:
+
+*   **Azure OpenAI:** Private endpoint with custom subdomain
+*   **Azure Storage:** Private endpoint for blob access
+*   **Azure PostgreSQL:** Private subnet with delegation
+*   **Azure Speech:** Private endpoint when enabled
+
+### 9.2 VNet Integration
+
+*   **Application Subnet:** Web App and Function App VNet integration
+*   **Service Subnet:** Private endpoint subnet
+*   **Analytics Subnet:** PostgreSQL Flexible Server delegation
+*   **NSG Rules:** Network security group restrictions
+
+### 9.3 Multi-Deployment OpenAI Configuration
+
+Four deployment types configured:
+
+| Deployment | Purpose | Variable |
+|------------|---------|----------|
+| **Persona-Core-Chat** | Primary conversational AI | `OPENAI_DEPLOYMENT_PERSONA_CORE_CHAT` |
+| **Persona-High-Reasoning** | Complex reasoning tasks | `OPENAI_DEPLOYMENT_PERSONA_HIGH_REASONING` |
+| **PULSE-Audio-Realtime** | STT/TTS processing | `OPENAI_DEPLOYMENT_PULSE_AUDIO_REALTIME` |
+| **Persona-Visual-Asset** | Image/video generation | `OPENAI_DEPLOYMENT_PERSONA_VISUAL_ASSET` |
+
+---
+
+## 10. Deployment and Operations
+
+### 10.1 Terraform Infrastructure
+
+Modular Terraform configuration:
+
+*   **modules/app/:** Web App and Function App definitions
+*   **modules/openai/:** Azure OpenAI account and deployments
+*   **modules/storage/:** Blob storage with containers
+*   **modules/analytics_postgres/:** PostgreSQL analytics database
+*   **modules/speech/:** Azure Speech Services (optional)
+*   **modules/monitoring/:** Application Insights and Log Analytics
+
+### 10.2 Function App Orchestrator
+
+Python-based Azure Function App (`func-PULSE-scenario-{env}`):
+
+*   **Audio Processing:** `/audio/chunk` endpoint for real-time STT/TTS
+*   **Trainer Endpoints:** PULSE step coaching and evaluation
+*   **Readiness API:** User skill readiness calculations
+*   **Scenario Processing:** Configurable via `SCENARIO_PROCESS_PIPELINE`
+
+### 10.3 Next.js Web Application
+
+Production web application (`app-PULSE-ui-{env}`):
+
+*   **Server-Side Rendering:** Optimized page loads
+*   **API Routes:** Proxy layer to Function App
+*   **Static Assets:** Optimized delivery
+*   **Environment Configuration:** Build-time and runtime variables
+
+---
+
+## 11. Security Features
+
+### 11.1 Network Security
+
+*   **HTTPS Enforcement:** `https_only = true` on all web resources
+*   **Private Networking:** All AI and data services on private endpoints
+*   **VNet Integration:** Application traffic stays within virtual network
+*   **No Public Access:** `public_network_access_enabled = false` on sensitive resources
+
+### 11.2 Identity Security
+
+*   **System-Assigned Managed Identity:** Web App and Function App
+*   **RBAC Integration:** Azure AD role assignments
+*   **Secret Management:** Terraform variables for sensitive values
+*   **Session Security:** NextAuth.js with secure JWT handling
+
+### 11.3 Data Security
+
+*   **Encryption at Rest:** Azure-managed encryption on storage and databases
+*   **TLS 1.2+:** Enforced on all connections
+*   **Blob Container Access:** Private containers with SAS tokens where needed
+*   **Audit Logging:** Application Insights for access tracking
+
+---
+
+## 12. Environment Configuration
+
+### 12.1 Key Environment Variables
+
+| Category | Variable | Description |
+|----------|----------|-------------|
+| **OpenAI** | `OPENAI_ENDPOINT` | Azure OpenAI service endpoint |
+| **OpenAI** | `OPENAI_API_VERSION` | API version string |
+| **OpenAI** | `AZURE_OPENAI_API_KEY` | Service authentication key |
+| **Auth** | `AUTH_MODE` | Authentication mode (sso/bypass) |
+| **Auth** | `NEXTAUTH_SECRET` | Session encryption secret |
+| **Analytics** | `PULSE_ANALYTICS_DB_HOST` | PostgreSQL hostname |
+| **Storage** | `STORAGE_ACCOUNT_NAME` | Blob storage account |
+| **Feature** | `NEXT_PUBLIC_ENABLE_ADMIN` | Admin UI visibility |
+| **Feature** | `TRAINING_ORCHESTRATOR_ENABLED` | Trainer functionality |
+
+### 12.2 Feature Flags
+
+*   `NEXT_PUBLIC_ENABLE_ADMIN`: Show/hide admin navigation
+*   `NEXT_PUBLIC_ENABLE_TRAINING`: Enable training mode UI
+*   `NEXT_PUBLIC_ENV_NAME`: Environment indicator (dev/staging/prod)
+*   `PULSE_TRAINER_ENABLED`: Enable trainer LLM calls
+*   `TRAINING_ORCHESTRATOR_ENABLED`: Enable orchestrator features
+*   `AUDIO_PROCESSING_ENABLED`: Enable audio pipeline
+
+---
+
+## Appendix: Architecture Diagram
+
+For a visual representation of the complete system architecture, see the generated diagram:
+
+*   **Source:** `docs/PULSE_network_diagram.py`
+*   **Output:** `docs/PULSE_network_diagram.png` (PNG) or `docs/PULSE_network_diagram.svg` (SVG)
+*   **Features:**
+    - Terraform-parsed resource discovery
+    - Azure CLI resource validation
+    - A0 plotter-sized output with optimized layout
+    - User interaction flows visualization
+
+---
+
+## Appendix: Security Assessment
+
+For a comprehensive security assessment of the architecture, see:
+
+*   **Document:** `docs/securedbydesign.md`
+*   **Coverage:** Infrastructure, network, application, data, AI/ML security
+*   **Status:** Secure-by-design analysis with production readiness checklist

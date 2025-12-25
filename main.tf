@@ -63,6 +63,119 @@ resource "azurerm_subnet" "subnet_private_endpoints" {
 }
 
 ########################
+# Network Security Groups
+########################
+
+# NSG for App subnet (Web App and Function App)
+resource "azurerm_network_security_group" "nsg_app" {
+  name                = "nsg-PULSE-app"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  # Allow HTTPS outbound to Azure services
+  security_rule {
+    name                       = "AllowAzureServicesOutbound"
+    priority                   = 100
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "VirtualNetwork"
+    destination_address_prefix = "AzureCloud"
+    description                = "Allow HTTPS to Azure services"
+  }
+
+  # Allow outbound to private endpoints
+  security_rule {
+    name                       = "AllowPrivateEndpointsOutbound"
+    priority                   = 110
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_ranges    = ["443", "5432"]
+    source_address_prefix      = var.subnet_app_prefix
+    destination_address_prefix = var.subnet_private_endpoints_prefix
+    description                = "Allow traffic to private endpoints"
+  }
+
+  tags = merge(local.common_tags, { purpose = "app-services" })
+}
+
+# NSG for Private Endpoints subnet
+resource "azurerm_network_security_group" "nsg_private_endpoints" {
+  name                = "nsg-PULSE-private-endpoints"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  # Allow inbound from App subnet
+  security_rule {
+    name                       = "AllowAppSubnetInbound"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = var.subnet_app_prefix
+    destination_address_prefix = var.subnet_private_endpoints_prefix
+    description                = "Allow traffic from App subnet"
+  }
+
+  tags = merge(local.common_tags, { purpose = "private-endpoints" })
+}
+
+# NSG for PostgreSQL subnet
+resource "azurerm_network_security_group" "nsg_postgres" {
+  name                = "nsg-PULSE-postgres"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  # Allow PostgreSQL from App subnet
+  security_rule {
+    name                       = "AllowPostgresFromAppSubnet"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "5432"
+    source_address_prefix      = var.subnet_app_prefix
+    destination_address_prefix = var.analytics_pg_subnet_prefix
+    description                = "Allow PostgreSQL from App subnet"
+  }
+
+  # Allow Azure management for PostgreSQL
+  security_rule {
+    name                       = "AllowAzureManagement"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "5432"
+    source_address_prefix      = "AzureCloud"
+    destination_address_prefix = var.analytics_pg_subnet_prefix
+    description                = "Allow Azure management for PostgreSQL"
+  }
+
+  tags = merge(local.common_tags, { purpose = "postgresql" })
+}
+
+# Associate NSG with App subnet
+resource "azurerm_subnet_network_security_group_association" "app_nsg_assoc" {
+  subnet_id                 = azurerm_subnet.subnet_app.id
+  network_security_group_id = azurerm_network_security_group.nsg_app.id
+}
+
+# Associate NSG with Private Endpoints subnet
+resource "azurerm_subnet_network_security_group_association" "private_endpoints_nsg_assoc" {
+  subnet_id                 = azurerm_subnet.subnet_private_endpoints.id
+  network_security_group_id = azurerm_network_security_group.nsg_private_endpoints.id
+}
+
+########################
 # Azure OpenAI (Cognitive Account + Deployments via module)
 ########################
 
@@ -324,6 +437,10 @@ module "analytics_postgres" {
   analytics_pg_backup_retention_days = var.analytics_pg_backup_retention_days
   analytics_pg_admin_username       = var.analytics_pg_admin_username
   analytics_pg_admin_password       = var.analytics_pg_admin_password
+
+  # NSG for PostgreSQL subnet
+  network_security_group_id  = azurerm_network_security_group.nsg_postgres.id
+  enable_nsg_association     = true
 }
 
 ########################
@@ -358,6 +475,7 @@ module "app" {
   storage_interaction_logs_container        = azurerm_storage_container.interaction_logs.name
 
   app_insights_connection_string = azurerm_application_insights.app_insights.connection_string
+  log_analytics_workspace_id   = azurerm_log_analytics_workspace.log_analytics.workspace_id
 
   analytics_pg_fqdn           = module.analytics_postgres.analytics_pg_fqdn
   analytics_pg_database_name  = module.analytics_postgres.analytics_pg_database_name
@@ -377,6 +495,9 @@ module "app" {
   azure_ad_tenant_id     = var.azure_ad_tenant_id
   nextauth_secret        = var.nextauth_secret
   nextauth_url           = var.nextauth_url
+
+  # Security Configuration
+  function_app_shared_secret = var.function_app_shared_secret
 }
 
 ########################

@@ -5,6 +5,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { requireAdmin } from "@/lib/auth-utils";
+import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors";
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/lib/rate-limiter";
+import { handleApiError } from "@/lib/errors";
+import { auditLog, getAuditIp } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -54,15 +59,43 @@ const VOICE_DESCRIPTIONS: Record<string, string> = {
   alan: "British English male voice with clear pronunciation",
 };
 
-export async function POST(request: NextRequest) {
+export async function OPTIONS(req: NextRequest) {
+  return corsOptionsResponse(req);
+}
+
+export async function POST(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const ip = getAuditIp(req);
+
   try {
-    const body = await request.json();
+    // Require admin authentication for downloads
+    const authResult = await requireAdmin();
+    if (authResult.error) {
+      return new Response(authResult.error.body, {
+        status: 403,
+        headers: { "Content-Type": "application/json", ...getCorsHeaders(origin) },
+      });
+    }
+
+    // Rate limiting
+    const clientId = getClientId(req, authResult.session.user.userId);
+    const { allowed } = checkRateLimit(clientId, 'default');
+    if (!allowed) {
+      auditLog.rateLimited(clientId, 'voices/download', ip);
+      const response = rateLimitResponse();
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+      });
+    }
+
+    const body = await req.json();
     const { voice_id, name, gender, onnx_url, json_url } = body;
 
     if (!voice_id) {
       return NextResponse.json(
         { error: "voice_id is required" },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(origin) }
       );
     }
 
@@ -86,16 +119,26 @@ export async function POST(request: NextRequest) {
     };
     saveMetadata(metadata);
 
+    // Log admin action
+    auditLog.adminAction(
+      authResult.session.user.userId || authResult.session.user.id || 'unknown',
+      `download_voice:${voice_id}`,
+      ip
+    );
+
     return NextResponse.json({
       success: true,
       message: "Voice downloaded successfully",
       voice_id,
+    }, {
+      headers: getCorsHeaders(origin),
     });
   } catch (error) {
-    console.error("Failed to download voice:", error);
-    return NextResponse.json(
-      { error: "Failed to download voice" },
-      { status: 500 }
-    );
+    auditLog.error('api/orchestrator/voices/download', error, ip);
+    const response = handleApiError(error, 'api/orchestrator/voices/download');
+    return new Response(response.body, {
+      status: response.status,
+      headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+    });
   }
 }

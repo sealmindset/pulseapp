@@ -107,6 +107,11 @@ variable "app_insights_connection_string" {
   description = "Application Insights connection string."
 }
 
+variable "log_analytics_workspace_id" {
+  type        = string
+  description = "Log Analytics Workspace ID for querying logs."
+}
+
 variable "behavioral_mastery_threshold" {
   type        = number
   description = "Threshold for Behavioral Certification mastery (0-1)."
@@ -188,5 +193,13 @@ variable "nextauth_secret" {
 variable "nextauth_url" {
   type        = string
   description = "The canonical URL of the PULSE application."
+  default     = ""
+}
+
+# Security Configuration
+variable "function_app_shared_secret" {
+  type        = string
+  description = "Shared secret for authenticating requests from Web App to Function App."
+  sensitive   = true
   default     = ""
 }

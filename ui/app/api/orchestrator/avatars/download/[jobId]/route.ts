@@ -3,6 +3,10 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors";
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/lib/rate-limiter";
+import { handleApiError } from "@/lib/errors";
+import { auditLog, getAuditIp } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -17,21 +21,42 @@ const downloadJobs: Record<string, {
   error?: string;
 }> = {};
 
+export async function OPTIONS(req: NextRequest) {
+  return corsOptionsResponse(req);
+}
+
 // Note: In a real implementation, this would share state with the parent route
 // For now, we simulate the response
 
 export async function GET(
-  request: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
+  const origin = req.headers.get("origin");
+  const ip = getAuditIp(req);
+
   try {
+    // Rate limiting
+    const clientId = getClientId(req);
+    const { allowed } = checkRateLimit(clientId, 'default');
+    if (!allowed) {
+      auditLog.rateLimited(clientId, 'avatars/download/[jobId]', ip);
+      const response = rateLimitResponse();
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+      });
+    }
+
     const { jobId } = await params;
 
     // Check if job exists in our store
     const job = downloadJobs[jobId];
 
     if (job) {
-      return NextResponse.json(job);
+      return NextResponse.json(job, {
+        headers: getCorsHeaders(origin),
+      });
     }
 
     // For demo purposes, simulate a completed job if not found
@@ -43,12 +68,15 @@ export async function GET(
       message: "Download complete!",
       avatar_id: "unknown",
       name: "Avatar",
+    }, {
+      headers: getCorsHeaders(origin),
     });
   } catch (error) {
-    console.error("Failed to get download status:", error);
-    return NextResponse.json(
-      { error: "Failed to get download status" },
-      { status: 500 }
-    );
+    auditLog.error('api/orchestrator/avatars/download/[jobId]', error, ip);
+    const response = handleApiError(error, 'api/orchestrator/avatars/download/[jobId]');
+    return new Response(response.body, {
+      status: response.status,
+      headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+    });
   }
 }

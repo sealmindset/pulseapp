@@ -68,3 +68,15 @@ variable "analytics_pg_admin_password" {
   description = "Administrator password for the analytics PostgreSQL flexible server."
   sensitive   = true
 }
+
+variable "network_security_group_id" {
+  type        = string
+  description = "ID of the NSG to associate with the PostgreSQL subnet."
+  default     = null
+}
+
+variable "enable_nsg_association" {
+  type        = bool
+  description = "Whether to associate an NSG with the PostgreSQL subnet."
+  default     = false
+}

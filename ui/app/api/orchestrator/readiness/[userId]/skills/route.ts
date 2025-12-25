@@ -1,29 +1,63 @@
 import { NextRequest } from "next/server";
+import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors";
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/lib/rate-limiter";
+import { handleApiError } from "@/lib/errors";
+import { auditLog, getAuditIp } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    },
-  });
+export async function OPTIONS(req: NextRequest) {
+  return corsOptionsResponse(req);
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { userId: string } }) {
-  const base = process.env.FUNCTION_APP_BASE_URL;
-  if (!base) {
-    return new Response("Missing FUNCTION_APP_BASE_URL", { status: 500 });
+export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
+  const origin = req.headers.get("origin");
+  const ip = getAuditIp(req);
+
+  try {
+    // Rate limiting
+    const clientId = getClientId(req);
+    const { allowed } = checkRateLimit(clientId, 'default');
+    if (!allowed) {
+      auditLog.rateLimited(clientId, 'readiness/skills', ip);
+      const response = rateLimitResponse();
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+      });
+    }
+
+    const base = process.env.FUNCTION_APP_BASE_URL;
+    if (!base) {
+      return new Response(JSON.stringify({ error: "Configuration error" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...getCorsHeaders(origin) },
+      });
+    }
+
+    const target = `${base.replace(/\/$/, "")}/readiness/${encodeURIComponent(params.userId)}/skills`;
+    const res = await fetch(target, {
+      method: "GET",
+      headers: {
+        "X-Function-Key": process.env.FUNCTION_APP_SHARED_SECRET || "",
+      },
+    });
+
+    const body = await res.text();
+
+    return new Response(body, {
+      status: res.status,
+      headers: {
+        "Content-Type": res.headers.get("Content-Type") || "application/json",
+        ...getCorsHeaders(origin),
+      },
+    });
+  } catch (error) {
+    auditLog.error('api/orchestrator/readiness/[userId]/skills', error, ip);
+    const response = handleApiError(error, 'api/orchestrator/readiness/[userId]/skills');
+    return new Response(response.body, {
+      status: response.status,
+      headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+    });
   }
-
-  const target = `${base.replace(/\/$/, "")}/readiness/${encodeURIComponent(params.userId)}/skills`;
-  const res = await fetch(target, { method: "GET" });
-
-  const body = await res.text();
-  const headers = new Headers({ "Content-Type": res.headers.get("Content-Type") || "application/json" });
-  headers.set("Access-Control-Allow-Origin", "*");
-  return new Response(body, { status: res.status, headers });
 }

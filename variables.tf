@@ -314,3 +314,14 @@ variable "nextauth_url" {
   description = "The canonical URL of the PULSE application (e.g., https://pulse-training.azurewebsites.net)."
   default     = ""
 }
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+
+variable "function_app_shared_secret" {
+  type        = string
+  description = "Shared secret for authenticating requests from Web App to Function App. Generate with: openssl rand -base64 32"
+  sensitive   = true
+  default     = ""
+}

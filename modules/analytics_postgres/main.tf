@@ -14,7 +14,7 @@ resource "azurerm_subnet" "analytics_pg" {
     service_delegation {
       name = "Microsoft.DBforPostgreSQL/flexibleServers"
       actions = [
-        "Microsoft.Network/virtualNetworks/subnets/action",
+        "Microsoft.Network/virtualNetworks/subnets/join/action",
       ]
     }
   }
@@ -67,4 +67,11 @@ resource "azurerm_postgresql_flexible_server_database" "analytics_db" {
   server_id = azurerm_postgresql_flexible_server.analytics.id
   charset   = "UTF8"
   collation = "en_US.utf8"
+}
+
+# Associate NSG with PostgreSQL subnet
+resource "azurerm_subnet_network_security_group_association" "postgres_nsg_assoc" {
+  count                     = var.enable_nsg_association ? 1 : 0
+  subnet_id                 = azurerm_subnet.analytics_pg.id
+  network_security_group_id = var.network_security_group_id
 }

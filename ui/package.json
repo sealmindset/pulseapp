@@ -10,6 +10,8 @@
     "test": "jest"
   },
   "dependencies": {
+    "@azure/identity": "^4.13.0",
+    "@azure/monitor-query-logs": "^1.0.0",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-slot": "^1.2.4",
     "class-variance-authority": "^0.7.1",

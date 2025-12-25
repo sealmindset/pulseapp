@@ -5,6 +5,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { requireAdmin } from "@/lib/auth-utils";
+import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors";
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/lib/rate-limiter";
+import { handleApiError } from "@/lib/errors";
+import { auditLog, getAuditIp } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -46,15 +51,43 @@ function saveMetadata(metadata: Record<string, unknown>) {
   fs.writeFileSync(METADATA_FILE, JSON.stringify(metadata, null, 2));
 }
 
-export async function POST(request: NextRequest) {
+export async function OPTIONS(req: NextRequest) {
+  return corsOptionsResponse(req);
+}
+
+export async function POST(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const ip = getAuditIp(req);
+
   try {
-    const body = await request.json();
+    // Require admin authentication for downloads
+    const authResult = await requireAdmin();
+    if (authResult.error) {
+      return new Response(authResult.error.body, {
+        status: 403,
+        headers: { "Content-Type": "application/json", ...getCorsHeaders(origin) },
+      });
+    }
+
+    // Rate limiting
+    const clientId = getClientId(req, authResult.session.user.userId);
+    const { allowed } = checkRateLimit(clientId, 'default');
+    if (!allowed) {
+      auditLog.rateLimited(clientId, 'avatars/download', ip);
+      const response = rateLimitResponse();
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+      });
+    }
+
+    const body = await req.json();
     const { avatar_id, name, gender, style } = body;
 
     if (!avatar_id) {
       return NextResponse.json(
         { error: "avatar_id is required" },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(origin) }
       );
     }
 
@@ -73,17 +106,27 @@ export async function POST(request: NextRequest) {
     // Start download in background (simulated for demo)
     simulateDownload(jobId, avatar_id, name, gender, style);
 
+    // Log admin action
+    auditLog.adminAction(
+      authResult.session.user.userId || authResult.session.user.id || 'unknown',
+      `download_avatar:${avatar_id}`,
+      ip
+    );
+
     return NextResponse.json({
       job_id: jobId,
       status: "starting",
       message: "Download started",
+    }, {
+      headers: getCorsHeaders(origin),
     });
   } catch (error) {
-    console.error("Failed to start avatar download:", error);
-    return NextResponse.json(
-      { error: "Failed to start download" },
-      { status: 500 }
-    );
+    auditLog.error('api/orchestrator/avatars/download', error, ip);
+    const response = handleApiError(error, 'api/orchestrator/avatars/download');
+    return new Response(response.body, {
+      status: response.status,
+      headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+    });
   }
 }
 
@@ -153,12 +196,38 @@ async function simulateDownload(
   }
 }
 
-export async function GET(request: NextRequest) {
-  // This endpoint is for listing all jobs (optional)
-  return NextResponse.json({
-    jobs: Object.entries(downloadJobs).map(([id, job]) => ({
-      id,
-      ...job,
-    })),
-  });
+export async function GET(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const ip = getAuditIp(req);
+
+  try {
+    // Rate limiting
+    const clientId = getClientId(req);
+    const { allowed } = checkRateLimit(clientId, 'default');
+    if (!allowed) {
+      auditLog.rateLimited(clientId, 'avatars/download', ip);
+      const response = rateLimitResponse();
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+      });
+    }
+
+    // This endpoint is for listing all jobs (optional)
+    return NextResponse.json({
+      jobs: Object.entries(downloadJobs).map(([id, job]) => ({
+        id,
+        ...job,
+      })),
+    }, {
+      headers: getCorsHeaders(origin),
+    });
+  } catch (error) {
+    auditLog.error('api/orchestrator/avatars/download', error, ip);
+    const response = handleApiError(error, 'api/orchestrator/avatars/download');
+    return new Response(response.body, {
+      status: response.status,
+      headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+    });
+  }
 }

@@ -1,36 +1,67 @@
 import { NextRequest } from "next/server";
+import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors";
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/lib/rate-limiter";
+import { handleApiError } from "@/lib/errors";
+import { auditLog, getAuditIp } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    },
-  });
+export async function OPTIONS(req: NextRequest) {
+  return corsOptionsResponse(req);
 }
 
 export async function POST(req: NextRequest) {
-  const base = process.env.FUNCTION_APP_BASE_URL;
-  if (!base) {
-    return new Response("Missing FUNCTION_APP_BASE_URL", { status: 500 });
+  const origin = req.headers.get("origin");
+  const ip = getAuditIp(req);
+
+  try {
+    // Rate limiting
+    const clientId = getClientId(req);
+    const { allowed } = checkRateLimit(clientId, 'default');
+    if (!allowed) {
+      auditLog.rateLimited(clientId, 'avatar/token', ip);
+      const response = rateLimitResponse();
+      return new Response(response.body, {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+      });
+    }
+
+    const base = process.env.FUNCTION_APP_BASE_URL;
+    if (!base) {
+      return new Response(JSON.stringify({ error: "Configuration error" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...getCorsHeaders(origin) },
+      });
+    }
+
+    const json = await req.json();
+    const target = `${base.replace(/\/$/, "")}/avatar/token`;
+
+    const res = await fetch(target, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Function-Key": process.env.FUNCTION_APP_SHARED_SECRET || "",
+      },
+      body: JSON.stringify(json),
+    });
+
+    const body = await res.text();
+
+    return new Response(body, {
+      status: res.status,
+      headers: {
+        "Content-Type": res.headers.get("Content-Type") || "application/json",
+        ...getCorsHeaders(origin),
+      },
+    });
+  } catch (error) {
+    auditLog.error('api/orchestrator/avatar/token', error, ip);
+    const response = handleApiError(error, 'api/orchestrator/avatar/token');
+    return new Response(response.body, {
+      status: response.status,
+      headers: { ...Object.fromEntries(response.headers), ...getCorsHeaders(origin) },
+    });
   }
-
-  const json = await req.json();
-  const target = `${base.replace(/\/$/, "")}/avatar/token`;
-
-  const res = await fetch(target, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(json),
-  });
-
-  const body = await res.text();
-  const headers = new Headers({ "Content-Type": res.headers.get("Content-Type") || "application/json" });
-  headers.set("Access-Control-Allow-Origin", "*");
-
-  return new Response(body, { status: res.status, headers });
 }
